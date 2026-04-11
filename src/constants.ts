@@ -26,9 +26,6 @@ export const FLIPPER_ANGULAR_SPEED = 0.018;
 /** Half-thickness of a flipper arm (normalized) */
 export const FLIPPER_THICKNESS = 0.022;
 
-/** Normalized length of each flipper arm */
-export const FLIPPER_LENGTH = 0.20;
-
 /** Maximum plunger charge time in ms */
 export const MAX_PLUNGER_CHARGE_MS = 1500;
 

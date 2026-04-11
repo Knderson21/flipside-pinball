@@ -32,7 +32,7 @@ import { defaultTheme } from './theme';
 export class Game {
   private readonly renderer: Renderer;
   private readonly input: InputManager;
-  private state: GameState;
+  private readonly state: GameState;
   private rafId = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -47,12 +47,7 @@ export class Game {
     this.rafId = requestAnimationFrame(this.loop);
   }
 
-  stop(): void {
-    cancelAnimationFrame(this.rafId);
-    this.input.destroy();
-  }
-
-  handleResize(windowW: number, windowH: number): void {
+handleResize(windowW: number, windowH: number): void {
     this.renderer.resize(windowW, windowH);
   }
 

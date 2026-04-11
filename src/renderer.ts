@@ -1,4 +1,4 @@
-import type { Ball, Bumper, Flipper, GameState, Theme, Vec2 } from './types';
+import type { Ball, Bumper, Flipper, GameState, Theme } from './types';
 import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, TABLE, TABLE_ASPECT } from './constants';
 
 export class Renderer {
