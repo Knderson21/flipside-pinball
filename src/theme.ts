@@ -1,0 +1,25 @@
+import type { Theme } from './types';
+
+export const defaultTheme: Theme = {
+  background: '#0a0a1a',
+  tableFill: '#0b1523',
+  tableBorder: '#1e3a5f',
+  ballColor: '#b0b8c8',
+  ballHighlight: '#e8f0ff',
+  flipperColor: '#1a44aa',
+  flipperActiveColor: '#3388ff',
+  bumperIdleColor: '#112244',
+  bumperLitColor: '#ff6600',
+  bumperBorderColor: '#2255bb',
+  bumperLitBorderColor: '#ffaa22',
+  wallColor: '#1e3a5f',
+  plungerTrackColor: '#080f1a',
+  plungerColor: '#556677',
+  plungerChargedColor: '#ff3322',
+  scoreFont: '600 {size}px "Courier New", monospace',
+  scoreColor: '#00ff99',
+  hudBackground: 'rgba(0, 0, 0, 0.65)',
+  labelColor: '#8899cc',
+  drainColor: 'rgba(180, 0, 0, 0.35)',
+  guideColor: '#0d2040',
+};
