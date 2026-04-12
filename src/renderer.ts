@@ -393,14 +393,23 @@ export class Renderer {
     const { ctx } = this;
     const path = ORBIT.path;
 
-    // Draw orbit rail as a dashed path
+    // Draw orbit rail as a smooth Catmull-Rom spline (converted to cubic Beziers)
     ctx.strokeStyle = palette.orbitRailColor;
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
     ctx.moveTo(this.sx(path[0]!.x), this.sy(path[0]!.y));
-    for (let i = 1; i < path.length; i++) {
-      ctx.lineTo(this.sx(path[i]!.x), this.sy(path[i]!.y));
+    for (let i = 0; i < path.length - 1; i++) {
+      const p0 = path[Math.max(i - 1, 0)]!;
+      const p1 = path[i]!;
+      const p2 = path[i + 1]!;
+      const p3 = path[Math.min(i + 2, path.length - 1)]!;
+      // Catmull-Rom tangents → cubic Bezier control points
+      const cp1x = this.sx(p1.x + (p2.x - p0.x) / 6);
+      const cp1y = this.sy(p1.y + (p2.y - p0.y) / 6);
+      const cp2x = this.sx(p2.x - (p3.x - p1.x) / 6);
+      const cp2y = this.sy(p2.y - (p3.y - p1.y) / 6);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, this.sx(p2.x), this.sy(p2.y));
     }
     ctx.stroke();
     ctx.setLineDash([]);

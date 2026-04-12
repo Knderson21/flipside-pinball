@@ -38,8 +38,8 @@ export const TABLE = {
   PLUNGER_LANE_LEFT: 0.825,
 
   FLIPPER_Y: 0.87,
-  LEFT_FLIPPER_X: 0.30,
-  RIGHT_FLIPPER_X: 0.70,
+  LEFT_FLIPPER_X: 0.24,
+  RIGHT_FLIPPER_X: 0.635,
 
   BALL_SPAWN_X: 0.885,
   BALL_SPAWN_Y: 0.84,
@@ -57,14 +57,14 @@ export const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + 0.45;
 // ─── Default Bumper Layout ────────────────────────────────────────────────────
 
 export const DEFAULT_BUMPERS: ReadonlyArray<{ x: number; y: number; score: number }> = [
-  { x: 0.30, y: 0.24, score: 100 },
-  { x: 0.55, y: 0.18, score: 100 },
-  { x: 0.72, y: 0.28, score: 150 },
-  { x: 0.40, y: 0.36, score: 75 },
-  { x: 0.64, y: 0.40, score: 75 },
+  { x: 0.4375, y: 0.20, score: 100 },
+  { x: 0.2875, y: 0.28, score: 100 },
+  { x: 0.5875, y: 0.28, score: 100 },
+  { x: 0.3375, y: 0.38, score: 75 },
+  { x: 0.5375, y: 0.38, score: 75 },
 ] as const;
 
-export const BUMPER_RADIUS = 0.055;
+export const BUMPER_RADIUS = 0.045;
 export const TABLE_ASPECT = 0.52;
 
 // ─── Drop Target Layout ───────────────────────────────────────────────────────
@@ -79,9 +79,9 @@ export interface DropTargetDef {
 }
 
 export const DEFAULT_DROP_TARGETS: ReadonlyArray<DropTargetDef> = [
-  { x: 0.30, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
-  { x: 0.40, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
-  { x: 0.50, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.3375, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.4375, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.5375, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
 ] as const;
 
 // ─── Guide Wall Segments ──────────────────────────────────────────────────────
@@ -104,9 +104,9 @@ export interface RolloverDef {
 }
 
 export const DEFAULT_ROLLOVERS: ReadonlyArray<RolloverDef> = [
-  { x: 0.25, y: 0.12, score: 25 },
-  { x: 0.42, y: 0.12, score: 25 },
-  { x: 0.59, y: 0.12, score: 25 },
+  { x: 0.2675, y: 0.12, score: 25 },
+  { x: 0.4375, y: 0.12, score: 25 },
+  { x: 0.6075, y: 0.12, score: 25 },
 ] as const;
 
 export const ROLLOVER_RADIUS = 0.022;
@@ -116,7 +116,7 @@ export const ROLLOVER_RADIUS = 0.022;
 // drop targets. When the lock is lit, a ball entering the scoop is captured.
 
 export const LOCK_SCOOP = {
-  x: 0.50,
+  x: 0.4375,
   y: 0.48,
   radius: 0.032,
 } as const;
@@ -127,29 +127,34 @@ export const LOCK_SCOOP = {
 // the exit point. This avoids complex channel collision physics.
 
 export const ORBIT = {
-  entryX: 0.12,
-  entryY: 0.30,
+  entryX: 0.090,
+  entryY: 0.460,
   entryRadius: 0.04,
   /** Ball must be moving upward (negative vy) to enter */
   minSpeed: 0.001,
-  exitX: 0.75,
-  exitY: 0.30,
+  exitX: 0.785,
+  exitY: 0.460,
   exitVx: 0.0008,
   exitVy: 0.001,
-  transitTimeMs: 400,
+  transitTimeMs: 600,
   score: 500,
-  /** Polyline path for rendering and animation interpolation */
+  /** Polyline path for rendering and animation interpolation.
+   *  Wide arc centered at x=0.4375 (playfield center), symmetric about that axis.
+   *  Hugs ~0.04 inside LEFT_WALL (0.05) and PLUNGER_LANE_LEFT (0.825).
+   *  Entry/exit at y=0.460, apex at y≈0.065. */
   path: [
-    { x: 0.12, y: 0.30 },
-    { x: 0.10, y: 0.22 },
-    { x: 0.12, y: 0.14 },
-    { x: 0.20, y: 0.08 },
-    { x: 0.35, y: 0.05 },
-    { x: 0.50, y: 0.04 },
-    { x: 0.65, y: 0.05 },
-    { x: 0.73, y: 0.10 },
-    { x: 0.76, y: 0.20 },
-    { x: 0.75, y: 0.30 },
+    { x: 0.090, y: 0.460 },   // entry (left)
+    { x: 0.080, y: 0.350 },   // up left wall
+    { x: 0.085, y: 0.240 },   // mid-left wall
+    { x: 0.110, y: 0.150 },   // upper-left corner approach
+    { x: 0.180, y: 0.090 },   // rounding top-left
+    { x: 0.300, y: 0.065 },   // along top
+    { x: 0.575, y: 0.065 },   // along top (mirror)
+    { x: 0.695, y: 0.090 },   // rounding top-right
+    { x: 0.765, y: 0.150 },   // upper-right corner approach
+    { x: 0.790, y: 0.240 },   // mid-right wall
+    { x: 0.795, y: 0.350 },   // down right wall
+    { x: 0.785, y: 0.460 },   // exit (right)
   ] as ReadonlyArray<{ x: number; y: number }>,
 } as const;
 
@@ -172,22 +177,22 @@ export interface SlingshotDef {
 export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
   {
     // Left slingshot: between left wall and left flipper
-    // Wall-side at x=0.13 leaves 0.08 gap from LEFT_WALL (0.05) for ball to pass behind.
+    // Wall-side at x=0.11 leaves 0.06 gap from LEFT_WALL (0.05) for ball to pass behind.
     // Bottom corner (v2) raised to y=0.78 so ball can roll underneath.
-    v0: { x: 0.13, y: 0.68 },   // upper corner (near wall)
-    v1: { x: 0.25, y: 0.80 },   // lower-right (near flipper)
-    v2: { x: 0.13, y: 0.78 },   // lower-left (near wall) — raised to open bottom passage
+    v0: { x: 0.12, y: 0.68 },   // upper corner (near wall)
+    v1: { x: 0.22, y: 0.7916 },   // lower-right (near flipper)
+    v2: { x: 0.12, y: 0.76 },   // lower-left (near wall) — raised to open bottom passage
     kickEdge: 0,                 // v0→v1 is the hypotenuse (playfield-facing)
     openEdge: 1,                 // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
   {
     // Right slingshot: between right flipper and plunger lane
-    // Wall-side at x=0.75 leaves 0.075 gap from PLUNGER_LANE_LEFT (0.825) for ball to pass behind.
+    // Wall-side at x=0.765 leaves 0.06 gap from PLUNGER_LANE_LEFT (0.825) for ball to pass behind.
     // Bottom corner (v1) raised to y=0.78 so ball can roll underneath.
-    v0: { x: 0.75, y: 0.68 },   // upper corner (near lane wall)
-    v1: { x: 0.75, y: 0.78 },   // lower-right (near lane wall) — raised to open bottom passage
-    v2: { x: 0.63, y: 0.80 },   // lower-left (near flipper)
+    v0: { x: 0.755, y: 0.68 },  // upper corner (near lane wall)
+    v1: { x: 0.755, y: 0.76 },  // lower-right (near lane wall) — raised to open bottom passage
+    v2: { x: 0.655, y: 0.7916 },  // lower-left (near flipper)
     kickEdge: 2,                 // v2→v0 is the hypotenuse (playfield-facing)
     openEdge: 1,                 // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,

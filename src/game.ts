@@ -274,15 +274,20 @@ export class Game {
         state.balls.push(ob.ball);
         state.orbitBalls.splice(i, 1);
       } else {
-        // Interpolate position along orbit path
+        // Interpolate position along orbit path using Catmull-Rom spline
         const path = ORBIT.path;
         const pathT = t * (path.length - 1);
         const idx = Math.floor(pathT);
         const frac = pathT - idx;
+        const pm1 = path[Math.max(idx - 1, 0)]!;
         const p0 = path[idx]!;
         const p1 = path[Math.min(idx + 1, path.length - 1)]!;
-        ob.ball.position.x = p0.x + (p1.x - p0.x) * frac;
-        ob.ball.position.y = p0.y + (p1.y - p0.y) * frac;
+        const p2 = path[Math.min(idx + 2, path.length - 1)]!;
+        // Catmull-Rom cubic: q(t) = 0.5 * ((2*p0) + (-pm1+p1)*t + (2pm1 -5p0 +4p1 -p2)*t^2 + (-pm1 +3p0 -3p1 +p2)*t^3)
+        const f2 = frac * frac;
+        const f3 = f2 * frac;
+        ob.ball.position.x = 0.5 * (2*p0.x + (-pm1.x+p1.x)*frac + (2*pm1.x -5*p0.x +4*p1.x -p2.x)*f2 + (-pm1.x +3*p0.x -3*p1.x +p2.x)*f3);
+        ob.ball.position.y = 0.5 * (2*p0.y + (-pm1.y+p1.y)*frac + (2*pm1.y -5*p0.y +4*p1.y -p2.y)*f2 + (-pm1.y +3*p0.y -3*p1.y +p2.y)*f3);
       }
     }
 
@@ -490,7 +495,7 @@ export class Game {
       const angle = -Math.PI / 2 + (i - (spawnCount - 1) / 2) * 0.5;
       const speed = 0.0018;
       state.balls.push({
-        position: { x: 0.40 + i * 0.10, y: 0.35 },
+        position: { x: 0.3375 + i * 0.10, y: 0.35 },
         velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
         radius: BALL_RADIUS,
         active: true,
