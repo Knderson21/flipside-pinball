@@ -47,7 +47,7 @@ export const neonTheme: ThemePack = {
     pull: 'PULL',
     controls: [
       'Z / ← = LEFT FLIPPER',
-      'X / → = RIGHT FLIPPER',
+      '/ / → = RIGHT FLIPPER',
       'SPACE = PLUNGER',
       'T = SWAP THEME',
     ],
@@ -112,7 +112,7 @@ export const retroTheme: ThemePack = {
     pull: 'LAUNCH',
     controls: [
       'Z / ← = PORT THRUSTER',
-      'X / → = STARBOARD THRUSTER',
+      '/ / → = STARBOARD THRUSTER',
       'SPACE = LAUNCH',
       'T = SWAP THEME',
     ],

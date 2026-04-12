@@ -18,7 +18,7 @@ Open [http://localhost:5173](http://localhost:5173).
 | Action        | Keyboard                      | Touch                    |
 |---------------|-------------------------------|--------------------------|
 | Left flipper  | `Z` or `←`                    | Tap left 40% of screen   |
-| Right flipper | `X` or `→`                    | Tap right 40% of screen  |
+| Right flipper | `/` or `→`                    | Tap right 40% of screen  |
 | Plunger       | Hold `Space`, release to fire | Hold center 20%, release |
 | Start game    | `Space` or `Enter`            | Any touch                |
 | Swap theme    | `T`                           | —                        |
