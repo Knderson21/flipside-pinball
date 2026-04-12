@@ -57,7 +57,7 @@ export const neonTheme: ThemePack = {
       'Z / ← = LEFT FLIPPER',
       '/ / → = RIGHT FLIPPER',
       'SPACE = PLUNGER',
-      'T = SWAP THEME',
+      'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
   },
   sounds: {
@@ -134,7 +134,7 @@ export const retroTheme: ThemePack = {
       'Z / ← = PORT THRUSTER',
       '/ / → = STARBOARD THRUSTER',
       'SPACE = LAUNCH',
-      'T = SWAP THEME',
+      'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
   },
   sounds: {
@@ -194,8 +194,176 @@ export const retroTheme: ThemePack = {
   },
 };
 
+// ─── Alternate theme: Sakura Dream (pink/pastel) ────────────────────────────
+
+const sakuraPalette: ColorPalette = {
+  background: '#fff0f5',
+  tableFill: '#fce4ec',
+  tableBorder: '#f48fb1',
+  ballColor: '#ffffff',
+  ballHighlight: '#fff9c4',
+  flipperColor: '#e91e90',
+  flipperActiveColor: '#ff69b4',
+  bumperIdleColor: '#fce4ec',
+  bumperLitColor: '#ff80ab',
+  bumperBorderColor: '#f48fb1',
+  bumperLitBorderColor: '#ff4081',
+  dropTargetColor: '#f06292',
+  dropTargetDownColor: '#f8bbd0',
+  wallColor: '#f48fb1',
+  plungerTrackColor: '#fce4ec',
+  plungerColor: '#e91e90',
+  plungerChargedColor: '#ff4081',
+  scoreColor: '#ad1457',
+  hudBackground: 'rgba(252, 228, 236, 0.80)',
+  labelColor: '#c2185b',
+  drainColor: 'rgba(233, 30, 99, 0.20)',
+  guideColor: '#f8bbd0',
+  slingshotColor: '#f06292',
+  slingshotLitColor: '#ff80ab',
+  rolloverColor: '#f48fb1',
+  rolloverLitColor: '#ff4081',
+  scoopColor: '#f8bbd0',
+  scoopLitColor: '#ff80ab',
+  lockIndicatorColor: '#ff4081',
+  orbitRailColor: '#f48fb1',
+  overlay: 'rgba(252, 228, 236, 0.85)',
+  accent: '#e91e63',
+};
+
+export const sakuraTheme: ThemePack = {
+  id: 'sakura',
+  name: 'Sakura Dream',
+  palette: sakuraPalette,
+  fonts: {
+    score: '"Georgia", serif',
+    label: '"Georgia", serif',
+    title: '"Georgia", serif',
+  },
+  strings: {
+    title: 'SAKURA',
+    subtitle: '~ a dreamy pinball ~',
+    pressStart: 'TAP OR PRESS SPACE',
+    gameOver: 'SWEET DREAMS...',
+    playAgain: 'PRESS SPACE TO PLAY AGAIN',
+    pull: 'PULL',
+    controls: [
+      'Z / \u2190 = LEFT FLIPPER',
+      '/ / \u2192 = RIGHT FLIPPER',
+      'SPACE = PLUNGER',
+      'F = SWAP THEME (TAP TOP ON MOBILE)',
+    ],
+  },
+  sounds: {
+    bumper:          { type: 'synth', freq: 880,  durationMs: 120, wave: 'sine',     volume: 0.08, slide: 440 },
+    flipper:         { type: 'synth', freq: 330,  durationMs: 60,  wave: 'sine',     volume: 0.07 },
+    launch:          { type: 'synth', freq: 440,  durationMs: 300, wave: 'sine',     volume: 0.10, slide: 880 },
+    drain:           { type: 'synth', freq: 660,  durationMs: 500, wave: 'sine',     volume: 0.10, slide: -330 },
+    dropTarget:      { type: 'synth', freq: 1047, durationMs: 100, wave: 'sine',     volume: 0.09, slide: 523 },
+    slingshot:       { type: 'synth', freq: 784,  durationMs: 80,  wave: 'sine',     volume: 0.08, slide: 392 },
+    rollover:        { type: 'synth', freq: 1319, durationMs: 80,  wave: 'sine',     volume: 0.06, slide: 660 },
+    lockBall:        { type: 'synth', freq: 523,  durationMs: 400, wave: 'sine',     volume: 0.10, slide: 262 },
+    orbitShot:       { type: 'synth', freq: 660,  durationMs: 500, wave: 'sine',     volume: 0.09, slide: 1320 },
+    missionComplete: { type: 'synth', freq: 523,  durationMs: 700, wave: 'sine',     volume: 0.12, slide: 1047 },
+    gameOver:        { type: 'synth', freq: 440,  durationMs: 900, wave: 'sine',     volume: 0.12, slide: -220 },
+  },
+  drawBackdrop: (rc, palette) => {
+    const { ctx, tableX, tableY, tableW, tableH } = rc;
+    ctx.fillStyle = palette.tableFill;
+    ctx.fillRect(tableX, tableY, tableW, tableH);
+
+    // Deterministic sparkles
+    ctx.fillStyle = '#ffffff';
+    const sparkleCount = 50;
+    for (let i = 0; i < sparkleCount; i++) {
+      const sx = ((i * 7919 + 10301) % 233280) / 233280;
+      const sy = ((i * 6271 + 23417) % 233280) / 233280;
+      const size = 1 + ((i * 131) % 3);
+      ctx.globalAlpha = 0.25 + ((i * 53) % 4) * 0.1;
+      // Draw a 4-point star sparkle
+      const px = tableX + sx * tableW;
+      const py = tableY + sy * tableH;
+      ctx.beginPath();
+      ctx.moveTo(px, py - size);
+      ctx.lineTo(px + size * 0.3, py);
+      ctx.lineTo(px, py + size);
+      ctx.lineTo(px - size * 0.3, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(px - size, py);
+      ctx.lineTo(px, py + size * 0.3);
+      ctx.lineTo(px + size, py);
+      ctx.lineTo(px, py - size * 0.3);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Deterministic sakura flower outlines scattered across the table
+    const flowerCount = 12;
+    ctx.strokeStyle = '#f48fb1';
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < flowerCount; i++) {
+      const fx = ((i * 8831 + 4967) % 233280) / 233280;
+      const fy = ((i * 5101 + 31247) % 233280) / 233280;
+      const fr = 6 + ((i * 71) % 5) * 2;
+      const cx = tableX + fx * tableW;
+      const cy = tableY + fy * tableH;
+      // Draw 5 petals as overlapping ellipses
+      for (let p = 0; p < 5; p++) {
+        const angle = (p * Math.PI * 2) / 5 - Math.PI / 2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.ellipse(0, -fr * 0.6, fr * 0.38, fr * 0.6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // Small circle center
+      ctx.beginPath();
+      ctx.arc(cx, cy, fr * 0.18, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  },
+  drawBumper: (rc, bumper, palette) => {
+    const { ctx, sx, sy, sl } = rc;
+    const cx = sx(bumper.position.x);
+    const cy = sy(bumper.position.y);
+    const r = sl(bumper.radius);
+    const lit = bumper.lit;
+
+    // Soft filled circle with a flower-like border
+    ctx.fillStyle = lit ? palette.bumperLitColor : palette.bumperIdleColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Petal scallops around the edge
+    ctx.strokeStyle = lit ? palette.bumperLitBorderColor : palette.bumperBorderColor;
+    ctx.lineWidth = lit ? 2.5 : 1.5;
+    const petalCount = 6;
+    for (let p = 0; p < petalCount; p++) {
+      const angle = (p * Math.PI * 2) / petalCount;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(angle) * r * 0.55, cy + Math.sin(angle) * r * 0.55, r * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = lit ? palette.bumperLitBorderColor : palette.labelColor;
+    const fontSize = Math.max(9, Math.round(sl(0.032)));
+    ctx.font = `700 ${fontSize}px "Georgia", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(bumper.scoreValue), cx, cy);
+    ctx.textBaseline = 'alphabetic';
+  },
+};
+
 // ─── Theme registry ───────────────────────────────────────────────────────────
 
-export const themes: ThemePack[] = [neonTheme, retroTheme];
+export const themes: ThemePack[] = [neonTheme, retroTheme, sakuraTheme];
 
 export const defaultTheme = neonTheme;

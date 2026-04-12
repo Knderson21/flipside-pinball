@@ -12,7 +12,7 @@ export interface InputState {
   swapTheme: boolean;
 }
 
-type TouchZone = 'left' | 'right' | 'plunger';
+type TouchZone = 'left' | 'right' | 'plunger' | 'themeSwap';
 
 /**
  * Listens to keyboard and touch events and exposes a flat InputState.
@@ -80,7 +80,7 @@ export class InputManager {
       case 'Enter':
         this.state.startGame = true;
         break;
-      case 'KeyT':
+      case 'KeyF':
         this.state.swapTheme = true;
         break;
     }
@@ -123,6 +123,9 @@ export class InputManager {
   private classifyTouch(touch: Touch): TouchZone {
     const rect = this.canvas.getBoundingClientRect();
     const relX = (touch.clientX - rect.left) / rect.width;
+    const relY = (touch.clientY - rect.top) / rect.height;
+    // Top 8% of screen = theme swap zone
+    if (relY < 0.08) return 'themeSwap';
     if (relX < 0.40) return 'left';
     if (relX > 0.60) return 'right';
     return 'plunger';
@@ -185,6 +188,9 @@ export class InputManager {
           this.state.plungerHeld = true;
           this.state.startGame = true;
         }
+        break;
+      case 'themeSwap':
+        if (active) this.state.swapTheme = true;
         break;
     }
   }
