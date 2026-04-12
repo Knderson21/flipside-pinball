@@ -89,8 +89,13 @@ export interface WallSegment {
 }
 
 export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [
-  { x1: TABLE.LEFT_WALL,                y1: TABLE.FLIPPER_Y - 0.08, x2: TABLE.LEFT_FLIPPER_X  - 0.01, y2: TABLE.FLIPPER_Y + 0.01 },
-  { x1: TABLE.PLUNGER_LANE_LEFT,        y1: TABLE.FLIPPER_Y - 0.08, x2: TABLE.RIGHT_FLIPPER_X + 0.01, y2: TABLE.FLIPPER_Y + 0.01 },
+  // Upper inlane guides — endpoints stop 0.02 units ABOVE each flipper pivot.
+  // This intentional gap redirects the ball onto the flipper face instead of
+  // the pivot end-cap, avoiding the corner trap that occurs when the wall
+  // terminates exactly at the pivot.
+  { x1: TABLE.LEFT_WALL,                y1: TABLE.FLIPPER_Y - 0.08, x2: TABLE.LEFT_FLIPPER_X,  y2: TABLE.FLIPPER_Y - 0.02 },
+  { x1: TABLE.PLUNGER_LANE_LEFT,        y1: TABLE.FLIPPER_Y - 0.08, x2: TABLE.RIGHT_FLIPPER_X, y2: TABLE.FLIPPER_Y - 0.02 },
+  // Lower outlane guides (below and outside the flippers)
   { x1: TABLE.LEFT_WALL + 0.04,         y1: TABLE.FLIPPER_Y + 0.04, x2: TABLE.LEFT_FLIPPER_X  - 0.06, y2: TABLE.FLIPPER_Y + 0.01 },
   { x1: TABLE.PLUNGER_LANE_LEFT - 0.04, y1: TABLE.FLIPPER_Y + 0.04, x2: TABLE.RIGHT_FLIPPER_X + 0.06, y2: TABLE.FLIPPER_Y + 0.01 },
 ];

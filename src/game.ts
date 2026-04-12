@@ -106,7 +106,9 @@ export class Game {
     if (!prevLeft && input.leftFlipper) this.audio.play('flipper');
     if (!prevRight && input.rightFlipper) this.audio.play('flipper');
 
-    if (state.phase === 'launching') {
+    // Allow plunger charging during 'launching' OR whenever a lane ball exists
+    // mid-play (ball rolled back into the lane during 'playing' phase).
+    if (state.phase === 'launching' || state.balls.some(b => b.inPlunger)) {
       state.plunger.charging = input.plungerHeld;
     }
   }
@@ -164,10 +166,11 @@ export class Game {
 
   private updatePlaying(dtMs: number): void {
     const { state } = this;
+    const input = this.input.getState();
 
-    // Step and collide every active ball.
+    // Step and collide every active ball that is not held in the plunger lane.
     for (const ball of state.balls) {
-      if (!ball.active) continue;
+      if (!ball.active || ball.inPlunger) continue;
       stepBall(ball, dtMs);
       collideBallWalls(ball);
 
@@ -208,36 +211,53 @@ export class Game {
       }
     }
 
-    // Handle balls that fell into the lane floor (weak launch) or drained.
-    // We iterate backwards so we can safely splice.
+    // Detect any active ball that has rolled into the plunger lane and lock it
+    // to the spawn position. Works during single-ball play and multiball —
+    // other balls keep running while this one waits to be re-launched.
+    for (const ball of state.balls) {
+      if (!ball.active || ball.inPlunger) continue;
+      if (
+        ball.position.x > TABLE.PLUNGER_LANE_LEFT &&
+        ball.velocity.y > 0 &&
+        ball.position.y > 0.3
+      ) {
+        ball.inPlunger = true;
+        ball.velocity.x = 0;
+        ball.velocity.y = 0;
+        state.plunger = this.makePlunger();
+      }
+    }
+
+    // Service the lane ball: advance plunger charge and handle launch.
+    const laneBall = state.balls.find(b => b.active && b.inPlunger);
+    if (laneBall) {
+      updatePlunger(state.plunger, dtMs);
+      laneBall.position.x = TABLE.BALL_SPAWN_X;
+      laneBall.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
+      if (input.plungerJustReleased && state.plunger.charge > 0.02) {
+        launchBall(laneBall, state.plunger);
+        this.audio.play('launch');
+      }
+    }
+
+    // Drain check — iterate backwards so splices are safe.
+    // inPlunger balls are locked in the lane and cannot drain.
     for (let i = state.balls.length - 1; i >= 0; i--) {
       const ball = state.balls[i];
-      if (!ball || !ball.active) continue;
-
-      // Lane-floor recovery only applies when exactly one ball exists
-      // (otherwise it would disrupt active multiball).
-      if (
-        state.balls.length === 1 &&
-        ball.position.x > TABLE.PLUNGER_LANE_LEFT &&
-        ball.position.y + ball.radius >= 0.909
-      ) {
-        this.resetToLaunching();
-        return;
-      }
-
+      if (!ball || !ball.active || ball.inPlunger) continue;
       if (isBallDrained(ball)) {
         ball.active = false;
         state.balls.splice(i, 1);
       }
     }
 
-    // If all balls are gone, consume a ball and transition to draining.
+    // Transition to draining only when every ball (including any lane ball) is gone.
     if (state.balls.length === 0) {
       this.audio.play('drain');
       state.ballsRemaining -= 1;
       state.phase = 'draining';
       state.drainTimer = 0;
-      state.mission.multiplier = 1; // reset multiplier on ball loss
+      state.mission.multiplier = 1;
     }
   }
 
@@ -268,12 +288,17 @@ export class Game {
     state.mission.multiplier = Math.min(state.mission.multiplier + 1, 5);
     state.score += DROP_TARGET_BONUS * state.mission.banksCleared;
 
-    state.mission.bannerText = 'MULTIBALL!';
+    const inMultiball = state.balls.filter(b => b.active).length > 1;
+
+    if (inMultiball) {
+      state.mission.bannerText = 'BANK CLEAR!';
+    } else {
+      state.mission.bannerText = 'MULTIBALL!';
+      this.spawnMultiball();
+    }
     state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
     state.mission.phase = 'complete';
     this.audio.play('missionComplete');
-
-    this.spawnMultiball();
 
     // Reset the drop-target bank so it can be cleared again.
     for (const t of state.dropTargets) t.down = false;
