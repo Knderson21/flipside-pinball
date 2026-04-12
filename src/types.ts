@@ -13,80 +13,95 @@ export interface Ball {
   radius: number;
   /** false while the ball is spawning or has been drained */
   active: boolean;
+  /** true while this ball is locked in the plunger lane waiting to launch */
+  inPlunger: boolean;
 }
 
 export type FlipperSide = 'left' | 'right';
 
 export interface Flipper {
   side: FlipperSide;
-  /** Pivot point in normalized (0..1) table coordinates */
   pivotX: number;
   pivotY: number;
-  /** Normalized length of the flipper arm */
   length: number;
-  /** Angle (radians) when flipper is at rest / drooped */
   restAngle: number;
-  /** Angle (radians) when flipper is raised / active */
   activeAngle: number;
-  /** Current render/physics angle (radians) */
   currentAngle: number;
-  /** Angular velocity (rad/ms) – used to impart momentum to ball on contact */
   angularVelocity: number;
-  /** True while the corresponding key/touch is held down */
   isActive: boolean;
 }
 
 export interface Bumper {
   id: string;
-  /** Center in normalized (0..1) table coordinates */
   position: Vec2;
-  /** Radius in normalized units */
   radius: number;
-  /** Points awarded on each hit */
   scoreValue: number;
-  /** True for a brief flash after being hit */
   lit: boolean;
-  /** Milliseconds remaining in the lit flash */
   litTimer: number;
 }
 
+export interface DropTarget {
+  id: string;
+  /** Center in normalized coordinates */
+  position: Vec2;
+  /** Half-width (x) */
+  halfWidth: number;
+  /** Half-height (y) */
+  halfHeight: number;
+  scoreValue: number;
+  /** true once the ball has knocked this target down */
+  down: boolean;
+}
+
 export interface Plunger {
-  /** 0 = uncharged, 1 = fully charged */
   charge: number;
-  /** True while the player is holding the plunger key/touch */
   charging: boolean;
-  /** True after the ball has been launched (one-shot flag) */
   launched: boolean;
 }
 
-// ─── Game State ───────────────────────────────────────────────────────────────
+// ─── Mission / Mode State ─────────────────────────────────────────────────────
+
+export type MissionPhase = 'idle' | 'active' | 'complete';
+
+export interface MissionState {
+  phase: MissionPhase;
+  /** How many drop-target banks the player has completed this ball */
+  banksCleared: number;
+  /** Scoring multiplier, grows with banksCleared */
+  multiplier: number;
+  /** ms remaining to show the "MULTIBALL!" banner */
+  bannerTimer: number;
+  bannerText: string;
+}
+
+// ─── Game Phases ──────────────────────────────────────────────────────────────
 
 export type GamePhase =
-  | 'attract'   // idle / title screen
-  | 'launching' // ball in plunger lane, player is charging
-  | 'playing'   // ball is live on the table
-  | 'draining'  // brief pause while ball drain animation plays
-  | 'gameover'; // all balls used
+  | 'attract'
+  | 'launching'
+  | 'playing'
+  | 'draining'
+  | 'gameover';
 
 export interface GameState {
   phase: GamePhase;
   score: number;
   highScore: number;
   ballsRemaining: number;
-  ball: Ball;
-  /** Index 0 = left flipper, index 1 = right flipper */
+  /** All live balls on the table. Single-ball play uses length 1; multiball grows it. */
+  balls: Ball[];
   flippers: [Flipper, Flipper];
   bumpers: Bumper[];
+  dropTargets: DropTarget[];
   plunger: Plunger;
-  /** DOMHighResTimeStamp of the last frame, used for delta-time calculation */
+  mission: MissionState;
   lastFrameTime: number;
-  /** Elapsed ms in the current 'draining' phase, for drain delay timing */
   drainTimer: number;
 }
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
+// ─── Theme Pack ───────────────────────────────────────────────────────────────
 
-export interface Theme {
+export interface ColorPalette {
   background: string;
   tableBorder: string;
   tableFill: string;
@@ -98,15 +113,88 @@ export interface Theme {
   bumperLitColor: string;
   bumperBorderColor: string;
   bumperLitBorderColor: string;
+  dropTargetColor: string;
+  dropTargetDownColor: string;
   wallColor: string;
   plungerTrackColor: string;
   plungerColor: string;
   plungerChargedColor: string;
-  /** Font template – renderer replaces `{size}` with a computed pixel value */
-  scoreFont: string;
   scoreColor: string;
   hudBackground: string;
   labelColor: string;
   drainColor: string;
   guideColor: string;
+  /** Overlay fill behind the attract / gameover screens */
+  overlay: string;
+  /** Accent color for the mission banner */
+  accent: string;
+}
+
+export interface ThemeFonts {
+  /** Font family for score digits. Monospace strongly recommended. */
+  score: string;
+  /** Font family for labels and HUD text */
+  label: string;
+  /** Font family for the title screen */
+  title: string;
+}
+
+export interface ThemeStrings {
+  title: string;
+  subtitle: string;
+  pressStart: string;
+  gameOver: string;
+  playAgain: string;
+  pull: string;
+  controls: string[];
+}
+
+/** Sound definition — either a URL asset or a synthesized beep */
+export type SoundDef =
+  | { type: 'url'; src: string; volume?: number }
+  | { type: 'synth'; freq: number; durationMs: number; wave?: OscillatorType; volume?: number; slide?: number };
+
+export interface ThemeSounds {
+  bumper?: SoundDef;
+  flipper?: SoundDef;
+  launch?: SoundDef;
+  drain?: SoundDef;
+  dropTarget?: SoundDef;
+  missionComplete?: SoundDef;
+  gameOver?: SoundDef;
+}
+
+/** Screen-space render context passed to theme draw overrides */
+export interface RenderContext {
+  ctx: CanvasRenderingContext2D;
+  /** normalized x → CSS pixel x */
+  sx: (nx: number) => number;
+  /** normalized y → CSS pixel y */
+  sy: (ny: number) => number;
+  /** normalized length → CSS pixels */
+  sl: (nl: number) => number;
+  tableX: number;
+  tableY: number;
+  tableW: number;
+  tableH: number;
+}
+
+/**
+ * A ThemePack fully describes the *presentation* of the game — colors, fonts,
+ * strings, sprite slots, sound events, and optional per-object draw overrides.
+ * Physics, layout, and game rules are entirely independent of the theme.
+ */
+export interface ThemePack {
+  id: string;
+  name: string;
+  palette: ColorPalette;
+  fonts: ThemeFonts;
+  strings: ThemeStrings;
+  sounds: ThemeSounds;
+  /** Optional draw overrides. Return true if the theme handled drawing. */
+  drawBackdrop?: (rc: RenderContext, palette: ColorPalette) => void;
+  drawBumper?: (rc: RenderContext, bumper: Bumper, palette: ColorPalette) => void;
+  drawBall?: (rc: RenderContext, ball: Ball, palette: ColorPalette) => void;
+  drawFlipper?: (rc: RenderContext, flipper: Flipper, palette: ColorPalette) => void;
+  drawDropTarget?: (rc: RenderContext, target: DropTarget, palette: ColorPalette) => void;
 }

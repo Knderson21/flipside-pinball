@@ -3,21 +3,20 @@
 export interface InputState {
   leftFlipper: boolean;
   rightFlipper: boolean;
-  /** True while the plunger key/touch is held */
   plungerHeld: boolean;
   /** True for exactly one frame when the plunger is released */
   plungerJustReleased: boolean;
   /** True for exactly one frame when the start action is triggered */
   startGame: boolean;
+  /** True for exactly one frame when the theme-swap key is pressed */
+  swapTheme: boolean;
 }
 
 type TouchZone = 'left' | 'right' | 'plunger';
 
-// ─── InputManager ─────────────────────────────────────────────────────────────
-
 /**
  * Listens to keyboard and touch events and exposes a flat InputState.
- * Call `clearFrameFlags()` once per game loop tick to reset one-shot flags.
+ * Call `clearFrameFlags()` once per game-loop tick to reset one-shot flags.
  */
 export class InputManager {
   private readonly canvas: HTMLCanvasElement;
@@ -27,9 +26,9 @@ export class InputManager {
     plungerHeld: false,
     plungerJustReleased: false,
     startGame: false,
+    swapTheme: false,
   };
 
-  /** Maps touch identifier → zone so we can handle multi-touch correctly */
   private activeTouches = new Map<number, TouchZone>();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -42,10 +41,10 @@ export class InputManager {
     return this.state;
   }
 
-  /** Call once per frame after consuming the state to reset one-shot flags. */
   clearFrameFlags(): void {
     this.state.plungerJustReleased = false;
     this.state.startGame = false;
+    this.state.swapTheme = false;
   }
 
   destroy(): void {
@@ -75,11 +74,14 @@ export class InputManager {
         this.state.rightFlipper = true;
         break;
       case 'Space':
-        e.preventDefault(); // prevent page scroll
+        e.preventDefault();
         this.state.plungerHeld = true;
         break;
       case 'Enter':
         this.state.startGame = true;
+        break;
+      case 'KeyT':
+        this.state.swapTheme = true;
         break;
     }
   };
@@ -99,7 +101,7 @@ export class InputManager {
         if (this.state.plungerHeld) {
           this.state.plungerHeld = false;
           this.state.plungerJustReleased = true;
-          this.state.startGame = true; // also acts as start in attract/gameover
+          this.state.startGame = true;
         }
         break;
       case 'Enter':
@@ -141,11 +143,9 @@ export class InputManager {
       const zone = this.activeTouches.get(touch.identifier);
       if (zone !== undefined) {
         this.activeTouches.delete(touch.identifier);
-        // Only deactivate the zone if no other active touch is using it
         const stillActive = Array.from(this.activeTouches.values()).includes(zone);
         if (!stillActive) {
           this.applyTouchZone(zone, false);
-          // Releasing the plunger zone sets the "just released" flag
           if (zone === 'plunger' && this.state.plungerHeld) {
             this.state.plungerHeld = false;
             this.state.plungerJustReleased = true;
@@ -158,12 +158,10 @@ export class InputManager {
 
   private onTouchMove = (e: TouchEvent): void => {
     e.preventDefault();
-    // Reclassify moved touches (thumb may slide into adjacent zone)
     for (const touch of Array.from(e.changedTouches)) {
       const oldZone = this.activeTouches.get(touch.identifier);
       const newZone = this.classifyTouch(touch);
       if (oldZone !== undefined && oldZone !== newZone) {
-        // Deactivate old zone if not used by another touch
         const stillActive = Array.from(this.activeTouches.values()).filter(z => z === oldZone).length > 1;
         if (!stillActive) this.applyTouchZone(oldZone, false);
         this.activeTouches.set(touch.identifier, newZone);
@@ -187,7 +185,6 @@ export class InputManager {
           this.state.plungerHeld = true;
           this.state.startGame = true;
         }
-        // Release is handled in onTouchEnd to set plungerJustReleased
         break;
     }
   }

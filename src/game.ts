@@ -1,20 +1,25 @@
-import type { Ball, Bumper, GameState, Plunger } from './types';
+import type { Ball, Bumper, DropTarget, GameState, MissionState, Plunger, ThemePack } from './types';
 import {
   BALLS_PER_GAME,
   BALL_RADIUS,
   BUMPER_LIT_DURATION_MS,
-  DEFAULT_BUMPERS,
   BUMPER_RADIUS,
+  DEFAULT_BUMPERS,
+  DEFAULT_DROP_TARGETS,
+  DRAIN_DELAY_MS,
+  DROP_TARGET_BONUS,
   GUIDE_WALLS,
   HIGH_SCORE_KEY,
+  MISSION_BANNER_DURATION_MS,
+  MULTIBALL_BALLS,
   TABLE,
 } from './constants';
 import {
   collideBallBumper,
+  collideBallDropTarget,
   collideBallFlipper,
   collideBallSegment,
   collideBallWalls,
-  DRAIN_DELAY_MS,
   isBallDrained,
   launchBall,
   makeLeftFlipper,
@@ -25,19 +30,26 @@ import {
 } from './physics';
 import { Renderer } from './renderer';
 import { InputManager } from './input';
-import { defaultTheme } from './theme';
-
-// ─── Game ─────────────────────────────────────────────────────────────────────
+import { AudioManager } from './audio';
+import { themes } from './theme';
 
 export class Game {
   private readonly renderer: Renderer;
   private readonly input: InputManager;
+  private readonly audio: AudioManager;
   private readonly state: GameState;
+  private readonly themeList: ThemePack[];
+  private themeIndex = 0;
   private rafId = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new Renderer(canvas, defaultTheme);
+  constructor(canvas: HTMLCanvasElement, themeList: ThemePack[] = themes) {
+    if (themeList.length === 0) throw new Error('Game requires at least one ThemePack');
+    this.themeList = themeList;
+    const first = themeList[0]!;
+    this.renderer = new Renderer(canvas, first);
     this.input = new InputManager(canvas);
+    this.audio = new AudioManager();
+    this.audio.setSounds(first.sounds);
     this.state = this.buildInitialState();
   }
 
@@ -47,18 +59,21 @@ export class Game {
     this.rafId = requestAnimationFrame(this.loop);
   }
 
-handleResize(windowW: number, windowH: number): void {
+  stop(): void {
+    cancelAnimationFrame(this.rafId);
+  }
+
+  handleResize(windowW: number, windowH: number): void {
     this.renderer.resize(windowW, windowH);
   }
 
   // ─── Game Loop ───────────────────────────────────────────────────────────────
 
   private loop = (timestamp: number): void => {
-    // Cap dt to ~2 frames to keep physics stable after tab-backgrounding
     const dtMs = Math.min(timestamp - this.state.lastFrameTime, 32);
     this.state.lastFrameTime = timestamp;
 
-    this.handleInput(dtMs);
+    this.handleInput();
     this.update(dtMs);
     this.renderer.render(this.state);
     this.input.clearFrameFlags();
@@ -68,11 +83,14 @@ handleResize(windowW: number, windowH: number): void {
 
   // ─── Input → State ──────────────────────────────────────────────────────────
 
-  private handleInput(dtMs: number): void {
+  private handleInput(): void {
     const input = this.input.getState();
     const { state } = this;
 
-    // Start-game action
+    if (input.swapTheme) {
+      this.cycleTheme();
+    }
+
     if (input.startGame) {
       if (state.phase === 'attract' || state.phase === 'gameover') {
         this.initGame();
@@ -80,16 +98,17 @@ handleResize(windowW: number, windowH: number): void {
       }
     }
 
-    // Flipper state
+    // Play flipper sound on the rising edge of either side
+    const prevLeft = state.flippers[0].isActive;
+    const prevRight = state.flippers[1].isActive;
     state.flippers[0].isActive = input.leftFlipper;
     state.flippers[1].isActive = input.rightFlipper;
+    if (!prevLeft && input.leftFlipper) this.audio.play('flipper');
+    if (!prevRight && input.rightFlipper) this.audio.play('flipper');
 
-    // Plunger charging
     if (state.phase === 'launching') {
       state.plunger.charging = input.plungerHeld;
     }
-
-    void dtMs; // dtMs not needed here but kept for symmetry
   }
 
   // ─── Per-Frame Update ────────────────────────────────────────────────────────
@@ -97,9 +116,13 @@ handleResize(windowW: number, windowH: number): void {
   private update(dtMs: number): void {
     const { state } = this;
 
-    // Always update flippers regardless of phase (they can animate during launching)
     updateFlipper(state.flippers[0], dtMs);
     updateFlipper(state.flippers[1], dtMs);
+
+    // Mission banner fade
+    if (state.mission.bannerTimer > 0) {
+      state.mission.bannerTimer = Math.max(0, state.mission.bannerTimer - dtMs);
+    }
 
     switch (state.phase) {
       case 'launching':
@@ -122,17 +145,19 @@ handleResize(windowW: number, windowH: number): void {
 
     updatePlunger(state.plunger, dtMs);
 
-    // Lock ball position in the plunger lane (compresses visually with charge)
-    state.ball.position.x = TABLE.BALL_SPAWN_X;
-    state.ball.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
-    state.ball.velocity.x = 0;
-    state.ball.velocity.y = 0;
-    state.ball.active = true;
+    // The lane ball is always balls[0] during launching
+    const laneBall = state.balls[0];
+    if (!laneBall) return;
+    laneBall.position.x = TABLE.BALL_SPAWN_X;
+    laneBall.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
+    laneBall.velocity.x = 0;
+    laneBall.velocity.y = 0;
+    laneBall.active = true;
+    laneBall.inPlunger = true;
 
-    // Launch on release – require a minimum charge so that releasing Space to
-    // dismiss the attract screen doesn't trigger an immediate zero-velocity launch.
     if (input.plungerJustReleased && state.plunger.charge > 0.02) {
-      launchBall(state.ball, state.plunger);
+      launchBall(laneBall, state.plunger);
+      this.audio.play('launch');
       state.phase = 'playing';
     }
   }
@@ -140,18 +165,40 @@ handleResize(windowW: number, windowH: number): void {
   private updatePlaying(dtMs: number): void {
     const { state } = this;
 
-    stepBall(state.ball, dtMs);
-    collideBallWalls(state.ball);
+    // Step and collide every active ball.
+    for (const ball of state.balls) {
+      if (!ball.active) continue;
+      stepBall(ball, dtMs);
+      collideBallWalls(ball);
 
-    // Bumper collisions
-    for (const bumper of state.bumpers) {
-      const result = collideBallBumper(state.ball, bumper);
-      if (result) {
-        state.score += bumper.scoreValue;
-        bumper.lit = true;
-        bumper.litTimer = BUMPER_LIT_DURATION_MS;
+      for (const bumper of state.bumpers) {
+        const hit = collideBallBumper(ball, bumper);
+        if (hit) {
+          state.score += bumper.scoreValue * state.mission.multiplier;
+          bumper.lit = true;
+          bumper.litTimer = BUMPER_LIT_DURATION_MS;
+          this.audio.play('bumper');
+        }
       }
-      // Tick down bumper lit timer
+
+      for (const t of state.dropTargets) {
+        if (collideBallDropTarget(ball, t)) {
+          state.score += t.scoreValue * state.mission.multiplier;
+          this.audio.play('dropTarget');
+          this.onDropTargetHit();
+        }
+      }
+
+      for (const seg of GUIDE_WALLS) {
+        collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+      }
+
+      collideBallFlipper(ball, state.flippers[0]);
+      collideBallFlipper(ball, state.flippers[1]);
+    }
+
+    // Tick bumper lit timers once per frame.
+    for (const bumper of state.bumpers) {
       if (bumper.lit) {
         bumper.litTimer -= dtMs;
         if (bumper.litTimer <= 0) {
@@ -161,33 +208,36 @@ handleResize(windowW: number, windowH: number): void {
       }
     }
 
-    // Guide wall collisions (angled walls near flippers)
-    for (const seg of GUIDE_WALLS) {
-      collideBallSegment(state.ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    // Handle balls that fell into the lane floor (weak launch) or drained.
+    // We iterate backwards so we can safely splice.
+    for (let i = state.balls.length - 1; i >= 0; i--) {
+      const ball = state.balls[i];
+      if (!ball || !ball.active) continue;
+
+      // Lane-floor recovery only applies when exactly one ball exists
+      // (otherwise it would disrupt active multiball).
+      if (
+        state.balls.length === 1 &&
+        ball.position.x > TABLE.PLUNGER_LANE_LEFT &&
+        ball.position.y + ball.radius >= 0.909
+      ) {
+        this.resetToLaunching();
+        return;
+      }
+
+      if (isBallDrained(ball)) {
+        ball.active = false;
+        state.balls.splice(i, 1);
+      }
     }
 
-    // Flipper collisions
-    collideBallFlipper(state.ball, state.flippers[0]);
-    collideBallFlipper(state.ball, state.flippers[1]);
-
-    // If the ball reached the lane floor (weak launch fell back down), reset to
-    // launching without costing a ball. Check this before the drain test so
-    // the floor wall always wins over the drain line for lane-side balls.
-    if (
-      state.ball.position.x > TABLE.PLUNGER_LANE_LEFT &&
-      state.ball.position.y + state.ball.radius >= TABLE.LANE_FLOOR_Y
-    ) {
-      this.initBall();
-      state.phase = 'launching';
-      return;
-    }
-
-    // Detect drain
-    if (isBallDrained(state.ball)) {
-      state.ball.active = false;
+    // If all balls are gone, consume a ball and transition to draining.
+    if (state.balls.length === 0) {
+      this.audio.play('drain');
       state.ballsRemaining -= 1;
       state.phase = 'draining';
       state.drainTimer = 0;
+      state.mission.multiplier = 1; // reset multiplier on ball loss
     }
   }
 
@@ -197,12 +247,54 @@ handleResize(windowW: number, windowH: number): void {
 
     if (state.drainTimer >= DRAIN_DELAY_MS) {
       if (state.ballsRemaining > 0) {
-        this.initBall();
-        state.phase = 'launching';
+        this.resetToLaunching();
       } else {
         this.saveHighScore();
+        this.audio.play('gameOver');
         state.phase = 'gameover';
       }
+    }
+  }
+
+  // ─── Mission / Drop Target Logic ─────────────────────────────────────────────
+
+  private onDropTargetHit(): void {
+    const { state } = this;
+    const allDown = state.dropTargets.every(t => t.down);
+    if (!allDown) return;
+
+    // Bank cleared! Award bonus, raise multiplier, start multiball, reset targets.
+    state.mission.banksCleared += 1;
+    state.mission.multiplier = Math.min(state.mission.multiplier + 1, 5);
+    state.score += DROP_TARGET_BONUS * state.mission.banksCleared;
+
+    state.mission.bannerText = 'MULTIBALL!';
+    state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
+    state.mission.phase = 'complete';
+    this.audio.play('missionComplete');
+
+    this.spawnMultiball();
+
+    // Reset the drop-target bank so it can be cleared again.
+    for (const t of state.dropTargets) t.down = false;
+  }
+
+  private spawnMultiball(): void {
+    const { state } = this;
+    // Use an existing live ball as the seed position (first active one we find).
+    const seed = state.balls.find(b => b.active && !b.inPlunger) ?? state.balls[0];
+    if (!seed) return;
+
+    for (let i = 0; i < MULTIBALL_BALLS; i++) {
+      const angle = -Math.PI / 2 + (i - (MULTIBALL_BALLS - 1) / 2) * 0.6;
+      const speed = 0.0018;
+      state.balls.push({
+        position: { x: seed.position.x, y: seed.position.y },
+        velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+        radius: BALL_RADIUS,
+        active: true,
+        inPlunger: false,
+      });
     }
   }
 
@@ -214,10 +306,12 @@ handleResize(windowW: number, windowH: number): void {
       score: 0,
       highScore: this.loadHighScore(),
       ballsRemaining: BALLS_PER_GAME,
-      ball: this.makeBall(),
+      balls: [this.makeBall()],
       flippers: [makeLeftFlipper(), makeRightFlipper()],
       bumpers: this.makeBumpers(),
+      dropTargets: this.makeDropTargets(),
       plunger: this.makePlunger(),
+      mission: this.makeMission(),
       lastFrameTime: performance.now(),
       drainTimer: 0,
     };
@@ -230,15 +324,17 @@ handleResize(windowW: number, windowH: number): void {
     state.flippers[0] = makeLeftFlipper();
     state.flippers[1] = makeRightFlipper();
     state.bumpers = this.makeBumpers();
-    this.initBall();
-    state.phase = 'launching';
+    state.dropTargets = this.makeDropTargets();
+    state.mission = this.makeMission();
+    this.resetToLaunching();
   }
 
-  private initBall(): void {
+  private resetToLaunching(): void {
     const { state } = this;
-    state.ball = this.makeBall();
+    state.balls = [this.makeBall()];
     state.plunger = this.makePlunger();
     state.drainTimer = 0;
+    state.phase = 'launching';
   }
 
   private makeBall(): Ball {
@@ -247,6 +343,7 @@ handleResize(windowW: number, windowH: number): void {
       velocity: { x: 0, y: 0 },
       radius: BALL_RADIUS,
       active: true,
+      inPlunger: true,
     };
   }
 
@@ -263,6 +360,39 @@ handleResize(windowW: number, windowH: number): void {
       lit: false,
       litTimer: 0,
     }));
+  }
+
+  private makeDropTargets(): DropTarget[] {
+    return DEFAULT_DROP_TARGETS.map((def, i) => ({
+      id: `drop-${i}`,
+      position: { x: def.x, y: def.y },
+      halfWidth: def.halfWidth,
+      halfHeight: def.halfHeight,
+      scoreValue: def.score,
+      down: false,
+    }));
+  }
+
+  private makeMission(): MissionState {
+    return {
+      phase: 'idle',
+      banksCleared: 0,
+      multiplier: 1,
+      bannerTimer: 0,
+      bannerText: '',
+    };
+  }
+
+  // ─── Theme Switching ────────────────────────────────────────────────────────
+
+  private cycleTheme(): void {
+    this.themeIndex = (this.themeIndex + 1) % this.themeList.length;
+    const next = this.themeList[this.themeIndex]!;
+    this.renderer.setTheme(next);
+    this.audio.setSounds(next.sounds);
+    // Flash a banner so the user sees the swap feedback.
+    this.state.mission.bannerText = next.name.toUpperCase();
+    this.state.mission.bannerTimer = 1200;
   }
 
   // ─── High Score Persistence ──────────────────────────────────────────────────
@@ -284,7 +414,7 @@ handleResize(windowW: number, windowH: number): void {
     try {
       localStorage.setItem(HIGH_SCORE_KEY, String(state.highScore));
     } catch {
-      // localStorage may be unavailable in some contexts; silently ignore
+      /* ignore */
     }
   }
 }

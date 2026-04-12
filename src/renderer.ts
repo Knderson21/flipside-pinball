@@ -1,10 +1,19 @@
-import type { Ball, Bumper, Flipper, GameState, Theme } from './types';
+import type {
+  Ball,
+  Bumper,
+  ColorPalette,
+  DropTarget,
+  Flipper,
+  GameState,
+  RenderContext,
+  ThemePack,
+} from './types';
 import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, TABLE, TABLE_ASPECT } from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly theme: Theme;
+  private theme: ThemePack;
 
   // Table bounds in CSS pixels (updated on every resize)
   private tableX = 0;
@@ -12,12 +21,24 @@ export class Renderer {
   private tableW = 0;
   private tableH = 0;
 
-  constructor(canvas: HTMLCanvasElement, theme: Theme) {
+  // Cache the last window size so we can re-apply the dpr transform on demand.
+  private lastW = 0;
+  private lastH = 0;
+
+  constructor(canvas: HTMLCanvasElement, theme: ThemePack) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not obtain 2D canvas context');
     this.ctx = ctx;
     this.theme = theme;
+  }
+
+  setTheme(theme: ThemePack): void {
+    this.theme = theme;
+  }
+
+  getTheme(): ThemePack {
+    return this.theme;
   }
 
   // ─── Resize / Scaling ───────────────────────────────────────────────────────
@@ -29,20 +50,23 @@ export class Renderer {
     this.canvas.style.width = `${windowW}px`;
     this.canvas.style.height = `${windowH}px`;
 
-    this.ctx.scale(dpr, dpr);
+    // Use setTransform — not scale() — so the dpr transform doesn't accumulate
+    // across resize events (which was a latent bug in the previous version).
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    this.lastW = windowW;
+    this.lastH = windowH;
     this.computeTableBounds(windowW, windowH);
   }
 
   private computeTableBounds(windowW: number, windowH: number): void {
-    const padding = 0.96; // use 96% of the limiting dimension
+    const padding = 0.96;
     const winAspect = windowW / windowH;
 
     if (winAspect > TABLE_ASPECT) {
-      // Window is wider than table – constrain by height
       this.tableH = windowH * padding;
       this.tableW = this.tableH * TABLE_ASPECT;
     } else {
-      // Window is taller / narrower – constrain by width
       this.tableW = windowW * padding;
       this.tableH = this.tableW / TABLE_ASPECT;
     }
@@ -53,100 +77,110 @@ export class Renderer {
 
   // ─── Coordinate Transforms ──────────────────────────────────────────────────
 
-  /** Normalized x → CSS pixel x */
-  private sx(nx: number): number {
-    return this.tableX + nx * this.tableW;
-  }
+  private sx = (nx: number): number => this.tableX + nx * this.tableW;
+  private sy = (ny: number): number => this.tableY + ny * this.tableH;
+  private sl = (nl: number): number => nl * this.tableW;
 
-  /** Normalized y → CSS pixel y */
-  private sy(ny: number): number {
-    return this.tableY + ny * this.tableH;
-  }
-
-  /** Normalized length → CSS pixels (uses table width as reference) */
-  private sl(nl: number): number {
-    return nl * this.tableW;
+  private makeRenderContext(): RenderContext {
+    return {
+      ctx: this.ctx,
+      sx: this.sx,
+      sy: this.sy,
+      sl: this.sl,
+      tableX: this.tableX,
+      tableY: this.tableY,
+      tableW: this.tableW,
+      tableH: this.tableH,
+    };
   }
 
   // ─── Main Render Entry ──────────────────────────────────────────────────────
 
   render(state: GameState): void {
     const { ctx } = this;
-    const W = this.canvas.width / (window.devicePixelRatio ?? 1);
-    const H = this.canvas.height / (window.devicePixelRatio ?? 1);
+    const palette = this.theme.palette;
+    const W = this.lastW;
+    const H = this.lastH;
 
-    // Clear the full canvas
-    ctx.fillStyle = this.theme.background;
+    // Background
+    ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, W, H);
 
-    this.drawTable();
-    this.drawPlungerLane(state);
-    this.drawBumpers(state.bumpers);
-    this.drawFlippers(state.flippers);
-    this.drawBall(state.ball);
-    this.drawHUD(state);
+    const rc = this.makeRenderContext();
 
-    if (state.phase === 'draining') {
-      this.drawDrainOverlay();
+    // Backdrop (theme may override)
+    if (this.theme.drawBackdrop) {
+      this.theme.drawBackdrop(rc, palette);
+      this.drawTableChrome(palette);
+    } else {
+      this.drawTable(palette);
     }
-    if (state.phase === 'attract') {
-      this.drawAttractScreen();
+
+    this.drawPlungerLane(state, palette);
+    this.drawDropTargets(state.dropTargets, rc, palette);
+    this.drawBumpers(state.bumpers, rc, palette);
+    this.drawFlippers(state.flippers, rc, palette);
+    for (const ball of state.balls) {
+      this.drawBall(ball, rc, palette);
     }
-    if (state.phase === 'gameover') {
-      this.drawGameOverScreen(state);
-    }
-    if (state.phase === 'launching') {
-      this.drawTouchHints();
-    }
+    this.drawHUD(state, palette);
+    this.drawMissionBanner(state, palette);
+
+    if (state.phase === 'draining') this.drawDrainOverlay(palette);
+    if (state.phase === 'attract') this.drawAttractScreen(palette);
+    if (state.phase === 'gameover') this.drawGameOverScreen(state, palette);
+    if (state.phase === 'launching') this.drawTouchHints(palette);
   }
 
   // ─── Table Background ───────────────────────────────────────────────────────
 
-  private drawTable(): void {
+  private drawTable(palette: ColorPalette): void {
     const { ctx } = this;
     const x = this.tableX;
     const y = this.tableY;
     const w = this.tableW;
     const h = this.tableH;
 
-    // Background fill
-    ctx.fillStyle = this.theme.tableFill;
+    ctx.fillStyle = palette.tableFill;
     ctx.fillRect(x, y, w, h);
 
-    // Side guide rails (decorative dark lanes along left/right edges)
-    ctx.fillStyle = this.theme.guideColor;
+    ctx.fillStyle = palette.guideColor;
     ctx.fillRect(x, y, this.sl(TABLE.LEFT_WALL), h);
     ctx.fillRect(this.sx(TABLE.RIGHT_WALL), y, this.sl(1 - TABLE.RIGHT_WALL), h);
 
-    // Border
-    ctx.strokeStyle = this.theme.tableBorder;
+    this.drawTableChrome(palette);
+  }
+
+  /** Borders and playfield walls — drawn on top of any custom backdrop. */
+  private drawTableChrome(palette: ColorPalette): void {
+    const { ctx } = this;
+    const x = this.tableX;
+    const y = this.tableY;
+    const w = this.tableW;
+    const h = this.tableH;
+
+    ctx.strokeStyle = palette.tableBorder;
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, w, h);
 
-    // Inner play-field walls (left and right of play area)
-    ctx.strokeStyle = this.theme.wallColor;
+    ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(this.sx(TABLE.LEFT_WALL), this.sy(TABLE.TOP_WALL));
     ctx.lineTo(this.sx(TABLE.LEFT_WALL), this.sy(TABLE.DRAIN_Y));
     ctx.moveTo(this.sx(TABLE.RIGHT_WALL), this.sy(TABLE.TOP_WALL));
     ctx.lineTo(this.sx(TABLE.RIGHT_WALL), this.sy(TABLE.DRAIN_Y));
-    // Top wall
     ctx.moveTo(this.sx(TABLE.LEFT_WALL), this.sy(TABLE.TOP_WALL));
     ctx.lineTo(this.sx(TABLE.RIGHT_WALL), this.sy(TABLE.TOP_WALL));
     ctx.stroke();
 
-    // Angled guide walls near flippers (classic pinball "inlane" shape)
-    this.drawFlipperGuides();
+    this.drawFlipperGuides(palette);
   }
 
-  /** Angled walls that funnel the ball toward the flippers.
-   *  Drawn from GUIDE_WALLS so they always match the physics segments. */
-  private drawFlipperGuides(): void {
+  private drawFlipperGuides(palette: ColorPalette): void {
     const { ctx } = this;
-    ctx.strokeStyle = this.theme.wallColor;
+    ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 2.5;
-
     for (const seg of GUIDE_WALLS) {
       ctx.beginPath();
       ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
@@ -157,11 +191,10 @@ export class Renderer {
 
   // ─── Plunger Lane ───────────────────────────────────────────────────────────
 
-  private drawPlungerLane(state: GameState): void {
+  private drawPlungerLane(state: GameState, palette: ColorPalette): void {
     const { ctx } = this;
 
-    // Lane background
-    ctx.fillStyle = this.theme.plungerTrackColor;
+    ctx.fillStyle = palette.plungerTrackColor;
     ctx.fillRect(
       this.sx(TABLE.PLUNGER_LANE_LEFT),
       this.sy(TABLE.TOP_WALL),
@@ -169,8 +202,7 @@ export class Renderer {
       this.sy(TABLE.DRAIN_Y) - this.sy(TABLE.TOP_WALL)
     );
 
-    // Lane left divider wall
-    ctx.strokeStyle = this.theme.wallColor;
+    ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(TABLE.TOP_WALL));
@@ -178,11 +210,11 @@ export class Renderer {
     ctx.stroke();
 
     if (state.phase === 'launching' || state.phase === 'playing') {
-      this.drawPlunger(state);
+      this.drawPlunger(state, palette);
     }
   }
 
-  private drawPlunger(state: GameState): void {
+  private drawPlunger(state: GameState, palette: ColorPalette): void {
     const { ctx } = this;
     const charge = state.plunger.charge;
 
@@ -190,12 +222,11 @@ export class Renderer {
     const laneRight = this.sx(TABLE.RIGHT_WALL);
     const laneWidth = laneRight - laneLeft;
     const laneBottom = this.sy(TABLE.DRAIN_Y);
-    const plungerHeight = this.sl(0.12); // fixed visual height of plunger rod
+    const plungerHeight = this.sl(0.12);
 
-    // Tick marks on the lane wall (charge indicator)
     const tickCount = 5;
     const tickAreaH = this.sl(0.18);
-    ctx.strokeStyle = this.theme.labelColor;
+    ctx.strokeStyle = palette.labelColor;
     ctx.lineWidth = 1;
     for (let i = 0; i <= tickCount; i++) {
       const ty = laneBottom - (i / tickCount) * tickAreaH;
@@ -205,18 +236,11 @@ export class Renderer {
       ctx.stroke();
     }
 
-    // Plunger rod – compressed as charge increases (visually moves ball up)
     const compressionOffset = charge * this.sl(0.06);
     const rodY = laneBottom - compressionOffset;
     const rodH = plungerHeight * (1 - charge * 0.4);
 
-    // Color transition based on charge
-    const r = Math.round(85 + charge * 170);
-    const g = Math.round(102 - charge * 102);
-    const b = Math.round(119 - charge * 85);
-    ctx.fillStyle = charge > 0.1
-      ? `rgb(${r},${g},${b})`
-      : this.theme.plungerColor;
+    ctx.fillStyle = charge > 0.1 ? palette.plungerChargedColor : palette.plungerColor;
 
     ctx.beginPath();
     ctx.roundRect(
@@ -228,35 +252,37 @@ export class Renderer {
     );
     ctx.fill();
 
-    // "PULL" label when not charging
     if (charge === 0 && state.phase === 'launching') {
-      ctx.fillStyle = this.theme.labelColor;
+      ctx.fillStyle = palette.labelColor;
       const fontSize = Math.round(this.sl(0.035));
-      ctx.font = `600 ${fontSize}px "Courier New", monospace`;
+      ctx.font = `600 ${fontSize}px ${this.theme.fonts.label}`;
       ctx.textAlign = 'center';
-      ctx.fillText('PULL', laneLeft + laneWidth / 2, laneBottom - this.sl(0.16));
+      ctx.fillText(this.theme.strings.pull, laneLeft + laneWidth / 2, laneBottom - this.sl(0.16));
     }
   }
 
   // ─── Bumpers ────────────────────────────────────────────────────────────────
 
-  private drawBumpers(bumpers: Bumper[]): void {
+  private drawBumpers(bumpers: Bumper[], rc: RenderContext, palette: ColorPalette): void {
     for (const bumper of bumpers) {
-      this.drawBumper(bumper);
+      if (this.theme.drawBumper) {
+        this.theme.drawBumper(rc, bumper, palette);
+      } else {
+        this.drawDefaultBumper(bumper, palette);
+      }
     }
   }
 
-  private drawBumper(bumper: Bumper): void {
+  private drawDefaultBumper(bumper: Bumper, palette: ColorPalette): void {
     const { ctx } = this;
     const cx = this.sx(bumper.position.x);
     const cy = this.sy(bumper.position.y);
     const r = this.sl(bumper.radius);
 
     const lit = bumper.lit;
-    const fillColor = lit ? this.theme.bumperLitColor : this.theme.bumperIdleColor;
-    const borderColor = lit ? this.theme.bumperLitBorderColor : this.theme.bumperBorderColor;
+    const fillColor = lit ? palette.bumperLitColor : palette.bumperIdleColor;
+    const borderColor = lit ? palette.bumperLitBorderColor : palette.bumperBorderColor;
 
-    // Outer glow when lit
     if (lit) {
       const grd = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.8);
       grd.addColorStop(0, 'rgba(255, 140, 0, 0.35)');
@@ -267,7 +293,6 @@ export class Renderer {
       ctx.fill();
     }
 
-    // Outer ring
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fillStyle = fillColor;
@@ -276,31 +301,59 @@ export class Renderer {
     ctx.lineWidth = lit ? 3 : 2;
     ctx.stroke();
 
-    // Inner dot
     ctx.beginPath();
     ctx.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
     ctx.fillStyle = lit ? '#ffffff' : borderColor;
     ctx.fill();
 
-    // Score label
     const fontSize = Math.max(9, Math.round(this.sl(0.032)));
-    ctx.fillStyle = lit ? '#ffffff' : this.theme.labelColor;
-    ctx.font = `700 ${fontSize}px "Courier New", monospace`;
+    ctx.fillStyle = lit ? '#ffffff' : palette.labelColor;
+    ctx.font = `700 ${fontSize}px ${this.theme.fonts.label}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(bumper.scoreValue), cx, cy + r * 1.55);
     ctx.textBaseline = 'alphabetic';
   }
 
-  // ─── Flippers ───────────────────────────────────────────────────────────────
+  // ─── Drop Targets ───────────────────────────────────────────────────────────
 
-  private drawFlippers(flippers: [Flipper, Flipper]): void {
-    for (const flipper of flippers) {
-      this.drawFlipper(flipper);
+  private drawDropTargets(targets: DropTarget[], rc: RenderContext, palette: ColorPalette): void {
+    for (const t of targets) {
+      if (this.theme.drawDropTarget) {
+        this.theme.drawDropTarget(rc, t, palette);
+      } else {
+        this.drawDefaultDropTarget(t, palette);
+      }
     }
   }
 
-  private drawFlipper(flipper: Flipper): void {
+  private drawDefaultDropTarget(t: DropTarget, palette: ColorPalette): void {
+    const { ctx } = this;
+    const x = this.sx(t.position.x - t.halfWidth);
+    const y = this.sy(t.position.y - t.halfHeight);
+    const w = this.sl(t.halfWidth * 2);
+    const h = this.sl(t.halfHeight * 2);
+
+    ctx.fillStyle = t.down ? palette.dropTargetDownColor : palette.dropTargetColor;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = t.down ? palette.wallColor : palette.accent;
+    ctx.lineWidth = t.down ? 1 : 2;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  // ─── Flippers ───────────────────────────────────────────────────────────────
+
+  private drawFlippers(flippers: [Flipper, Flipper], rc: RenderContext, palette: ColorPalette): void {
+    for (const flipper of flippers) {
+      if (this.theme.drawFlipper) {
+        this.theme.drawFlipper(rc, flipper, palette);
+      } else {
+        this.drawDefaultFlipper(flipper, palette);
+      }
+    }
+  }
+
+  private drawDefaultFlipper(flipper: Flipper, palette: ColorPalette): void {
     const { ctx } = this;
     const pivotX = this.sx(flipper.pivotX);
     const pivotY = this.sy(flipper.pivotY);
@@ -311,7 +364,6 @@ export class Renderer {
     ctx.translate(pivotX, pivotY);
     ctx.rotate(flipper.currentAngle);
 
-    // Flipper shape: tapered from thick at pivot to thin at tip
     const halfThickBase = thick * 0.65;
     const halfThickTip = thick * 0.28;
 
@@ -324,11 +376,10 @@ export class Renderer {
     ctx.closePath();
 
     ctx.fillStyle = flipper.isActive
-      ? this.theme.flipperActiveColor
-      : this.theme.flipperColor;
+      ? palette.flipperActiveColor
+      : palette.flipperColor;
     ctx.fill();
 
-    // Highlight stripe
     ctx.strokeStyle = flipper.isActive
       ? 'rgba(100, 180, 255, 0.6)'
       : 'rgba(60, 120, 200, 0.4)';
@@ -340,29 +391,31 @@ export class Renderer {
 
     ctx.restore();
 
-    // Pivot dot
     ctx.beginPath();
     ctx.arc(pivotX, pivotY, this.sl(0.012), 0, Math.PI * 2);
-    ctx.fillStyle = this.theme.wallColor;
+    ctx.fillStyle = palette.wallColor;
     ctx.fill();
   }
 
   // ─── Ball ────────────────────────────────────────────────────────────────────
 
-  private drawBall(ball: Ball): void {
+  private drawBall(ball: Ball, rc: RenderContext, palette: ColorPalette): void {
     if (!ball.active) return;
+    if (this.theme.drawBall) {
+      this.theme.drawBall(rc, ball, palette);
+      return;
+    }
     const { ctx } = this;
     const cx = this.sx(ball.position.x);
     const cy = this.sy(ball.position.y);
     const r = this.sl(ball.radius);
 
-    // Ball body with metallic radial gradient
     const grd = ctx.createRadialGradient(
       cx - r * 0.35, cy - r * 0.35, r * 0.05,
       cx, cy, r
     );
-    grd.addColorStop(0, this.theme.ballHighlight);
-    grd.addColorStop(0.45, this.theme.ballColor);
+    grd.addColorStop(0, palette.ballHighlight);
+    grd.addColorStop(0.45, palette.ballColor);
     grd.addColorStop(1, '#444455');
 
     ctx.beginPath();
@@ -373,33 +426,34 @@ export class Renderer {
 
   // ─── HUD ─────────────────────────────────────────────────────────────────────
 
-  private drawHUD(state: GameState): void {
+  private drawHUD(state: GameState, palette: ColorPalette): void {
     const { ctx } = this;
     const fontSize = Math.max(10, Math.round(this.tableW * 0.055));
     const smallFont = Math.max(8, Math.round(this.tableW * 0.038));
 
-    // HUD background bar
     const hudH = this.tableH * 0.065;
     const hudY = this.tableY - hudH - 4;
-    ctx.fillStyle = this.theme.hudBackground;
+    ctx.fillStyle = palette.hudBackground;
     ctx.fillRect(this.tableX, hudY, this.tableW, hudH + 4);
 
     ctx.textBaseline = 'middle';
     const midY = hudY + (hudH + 4) / 2;
 
-    // Current score (left)
-    ctx.font = `700 ${fontSize}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.scoreColor;
+    ctx.font = `700 ${fontSize}px ${this.theme.fonts.score}`;
+    ctx.fillStyle = palette.scoreColor;
     ctx.textAlign = 'left';
     ctx.fillText(String(state.score).padStart(7, '0'), this.tableX + 8, midY);
 
-    // High score (right)
-    ctx.font = `600 ${smallFont}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.labelColor;
+    ctx.font = `600 ${smallFont}px ${this.theme.fonts.label}`;
+    ctx.fillStyle = palette.labelColor;
     ctx.textAlign = 'right';
-    ctx.fillText(`HI ${String(state.highScore).padStart(7, '0')}`, this.tableX + this.tableW - 8, midY);
+    ctx.fillText(
+      `HI ${String(state.highScore).padStart(7, '0')}`,
+      this.tableX + this.tableW - 8,
+      midY,
+    );
 
-    // Ball dots (center)
+    // Ball dots
     const dotR = Math.max(4, this.tableW * 0.018);
     const dotSpacing = dotR * 2.8;
     const centerX = this.tableX + this.tableW / 2;
@@ -407,102 +461,143 @@ export class Renderer {
       const dx = centerX + (i - (BALLS_PER_GAME - 1) / 2) * dotSpacing;
       ctx.beginPath();
       ctx.arc(dx, midY, dotR, 0, Math.PI * 2);
-      ctx.fillStyle = i < state.ballsRemaining ? this.theme.scoreColor : '#333344';
+      ctx.fillStyle = i < state.ballsRemaining ? palette.scoreColor : '#333344';
       ctx.fill();
     }
 
+    // Multiplier indicator, shown only when > 1
+    if (state.mission.multiplier > 1) {
+      ctx.font = `700 ${smallFont}px ${this.theme.fonts.label}`;
+      ctx.fillStyle = palette.accent;
+      ctx.textAlign = 'center';
+      ctx.fillText(`x${state.mission.multiplier}`, centerX, midY + dotR * 2.2);
+    }
+
+    // Theme name (bottom-right of HUD bar)
+    ctx.font = `400 ${Math.max(7, smallFont - 2)}px ${this.theme.fonts.label}`;
+    ctx.fillStyle = palette.labelColor;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`[T] ${this.theme.name}`, this.tableX + this.tableW - 4, hudY + hudH + 6);
+
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // ─── Mission Banner ─────────────────────────────────────────────────────────
+
+  private drawMissionBanner(state: GameState, palette: ColorPalette): void {
+    if (state.mission.bannerTimer <= 0) return;
+
+    const { ctx } = this;
+    const cx = this.tableX + this.tableW / 2;
+    const cy = this.tableY + this.tableH * 0.42;
+
+    // Fade the last 400ms
+    const alpha = Math.min(1, state.mission.bannerTimer / 400);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const size = Math.round(this.tableW * 0.12);
+    ctx.font = `900 ${size}px ${this.theme.fonts.title}`;
+    ctx.fillStyle = palette.accent;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(state.mission.bannerText, cx, cy);
+
+    ctx.restore();
     ctx.textBaseline = 'alphabetic';
   }
 
   // ─── Drain Overlay ───────────────────────────────────────────────────────────
 
-  private drawDrainOverlay(): void {
+  private drawDrainOverlay(palette: ColorPalette): void {
     const { ctx } = this;
-    ctx.fillStyle = this.theme.drainColor;
+    ctx.fillStyle = palette.drainColor;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
   }
 
   // ─── Attract Screen ──────────────────────────────────────────────────────────
 
-  private drawAttractScreen(): void {
+  private drawAttractScreen(palette: ColorPalette): void {
     const { ctx } = this;
     const cx = this.tableX + this.tableW / 2;
     const cy = this.tableY + this.tableH / 2;
 
-    // Semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 20, 0.78)';
+    ctx.fillStyle = palette.overlay;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
 
-    // Title
     const titleSize = Math.round(this.tableW * 0.14);
-    ctx.font = `900 ${titleSize}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.scoreColor;
+    ctx.font = `900 ${titleSize}px ${this.theme.fonts.title}`;
+    ctx.fillStyle = palette.scoreColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('PINBALL', cx, cy - this.tableH * 0.12);
+    ctx.fillText(this.theme.strings.title, cx, cy - this.tableH * 0.18);
 
-    // Subtitle
     const subSize = Math.round(this.tableW * 0.055);
-    ctx.font = `600 ${subSize}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.labelColor;
-    ctx.fillText('PRESS SPACE OR ENTER', cx, cy + this.tableH * 0.04);
+    ctx.font = `600 ${subSize}px ${this.theme.fonts.label}`;
+    ctx.fillStyle = palette.labelColor;
+    ctx.fillText(this.theme.strings.subtitle, cx, cy - this.tableH * 0.06);
 
-    // Controls hint
+    ctx.font = `600 ${Math.round(subSize * 0.85)}px ${this.theme.fonts.label}`;
+    ctx.fillStyle = palette.accent;
+    ctx.fillText(this.theme.strings.pressStart, cx, cy + this.tableH * 0.02);
+
     const hintSize = Math.round(this.tableW * 0.038);
-    ctx.font = `${hintSize}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.labelColor;
-    ctx.fillText('Z / ← = LEFT FLIPPER', cx, cy + this.tableH * 0.12);
-    ctx.fillText('X / → = RIGHT FLIPPER', cx, cy + this.tableH * 0.16);
-    ctx.fillText('SPACE = PLUNGER', cx, cy + this.tableH * 0.20);
+    ctx.font = `${hintSize}px ${this.theme.fonts.label}`;
+    ctx.fillStyle = palette.labelColor;
+    for (let i = 0; i < this.theme.strings.controls.length; i++) {
+      const line = this.theme.strings.controls[i];
+      if (!line) continue;
+      ctx.fillText(line, cx, cy + this.tableH * 0.12 + i * this.tableH * 0.04);
+    }
 
     ctx.textBaseline = 'alphabetic';
   }
 
   // ─── Game Over Screen ─────────────────────────────────────────────────────────
 
-  private drawGameOverScreen(state: GameState): void {
+  private drawGameOverScreen(state: GameState, palette: ColorPalette): void {
     const { ctx } = this;
     const cx = this.tableX + this.tableW / 2;
     const cy = this.tableY + this.tableH / 2;
 
-    ctx.fillStyle = 'rgba(0, 0, 20, 0.82)';
+    ctx.fillStyle = palette.overlay;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
 
     const titleSize = Math.round(this.tableW * 0.11);
-    ctx.font = `900 ${titleSize}px "Courier New", monospace`;
-    ctx.fillStyle = '#ff4422';
+    ctx.font = `900 ${titleSize}px ${this.theme.fonts.title}`;
+    ctx.fillStyle = palette.bumperLitColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('GAME OVER', cx, cy - this.tableH * 0.10);
+    ctx.fillText(this.theme.strings.gameOver, cx, cy - this.tableH * 0.10);
 
     const scoreSize = Math.round(this.tableW * 0.065);
-    ctx.font = `700 ${scoreSize}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.scoreColor;
+    ctx.font = `700 ${scoreSize}px ${this.theme.fonts.score}`;
+    ctx.fillStyle = palette.scoreColor;
     ctx.fillText(String(state.score).padStart(7, '0'), cx, cy + this.tableH * 0.04);
 
     const subSize = Math.round(this.tableW * 0.042);
-    ctx.font = `600 ${subSize}px "Courier New", monospace`;
-    ctx.fillStyle = this.theme.labelColor;
-    ctx.fillText('PRESS SPACE TO PLAY AGAIN', cx, cy + this.tableH * 0.14);
+    ctx.font = `600 ${subSize}px ${this.theme.fonts.label}`;
+    ctx.fillStyle = palette.labelColor;
+    ctx.fillText(this.theme.strings.playAgain, cx, cy + this.tableH * 0.14);
 
     ctx.textBaseline = 'alphabetic';
   }
 
-  // ─── Touch Hints (shown during launching phase on mobile) ────────────────────
+  // ─── Touch Hints ─────────────────────────────────────────────────────────────
 
-  private drawTouchHints(): void {
+  private drawTouchHints(palette: ColorPalette): void {
     const { ctx } = this;
-    const W = this.canvas.width / (window.devicePixelRatio ?? 1);
-    const H = this.canvas.height / (window.devicePixelRatio ?? 1);
+    const W = this.lastW;
+    const H = this.lastH;
     const arrowH = Math.min(48, H * 0.06);
 
-    // Only show if canvas is narrow enough to suggest mobile
     if (W > 600) return;
 
     const drawArrow = (x: number, dir: 'left' | 'right' | 'up'): void => {
       ctx.save();
       ctx.globalAlpha = 0.35;
-      ctx.fillStyle = this.theme.scoreColor;
+      ctx.fillStyle = palette.scoreColor;
       ctx.beginPath();
       if (dir === 'left') {
         ctx.moveTo(x - arrowH / 2, H - arrowH * 0.6);
