@@ -68,8 +68,9 @@ export function collideBallWalls(ball: Ball): void {
     }
   }
 
-  // Lane floor — only applies while the ball is seated in the plunger lane.
-  if (ball.inPlunger && ball.position.x > TABLE.PLUNGER_LANE_LEFT) {
+  // Lane floor — catches any ball in the plunger lane, including one that was
+  // launched with insufficient power and fell back before exiting the top.
+  if (ball.position.x > TABLE.PLUNGER_LANE_LEFT) {
     if (ball.position.y + r > TABLE.LANE_FLOOR_Y) {
       ball.position.y = TABLE.LANE_FLOOR_Y - r;
       ball.velocity.y = -Math.abs(ball.velocity.y) * WALL_RESTITUTION * 0.25;
@@ -89,8 +90,12 @@ export function collideBallWalls(ball: Ball): void {
         ball.velocity.x = Math.abs(ball.velocity.x) * WALL_RESTITUTION;
       }
     } else {
-      // One-way: push any playing ball that crossed into the lane back to the playfield.
-      if (ball.position.x + r > TABLE.PLUNGER_LANE_LEFT) {
+      // One-way: push any playing ball that is drifting rightward into the lane back
+      // to the playfield. The velocity.x > 0 guard is critical: a just-launched ball
+      // starts at x = BALL_SPAWN_X (inside the lane) with velocity.x = 0, so it must
+      // be allowed to travel up the lane freely. Only a playfield ball approaching the
+      // lane from the left will have positive x-velocity, so we only block that case.
+      if (ball.position.x + r > TABLE.PLUNGER_LANE_LEFT && ball.velocity.x > 0) {
         ball.position.x = TABLE.PLUNGER_LANE_LEFT - r;
         ball.velocity.x = -Math.abs(ball.velocity.x) * WALL_RESTITUTION;
       }
@@ -321,7 +326,7 @@ export function makeLeftFlipper(): Flipper {
     side: 'left',
     pivotX: TABLE.LEFT_FLIPPER_X,
     pivotY: TABLE.FLIPPER_Y,
-    length: 0.20,
+    length: 0.175,
     restAngle: LEFT_FLIPPER_REST_ANGLE,
     activeAngle: LEFT_FLIPPER_ACTIVE_ANGLE,
     currentAngle: LEFT_FLIPPER_REST_ANGLE,
@@ -335,7 +340,7 @@ export function makeRightFlipper(): Flipper {
     side: 'right',
     pivotX: TABLE.RIGHT_FLIPPER_X,
     pivotY: TABLE.FLIPPER_Y,
-    length: 0.20,
+    length: 0.175,
     restAngle: RIGHT_FLIPPER_REST_ANGLE,
     activeAngle: RIGHT_FLIPPER_ACTIVE_ANGLE,
     currentAngle: RIGHT_FLIPPER_REST_ANGLE,

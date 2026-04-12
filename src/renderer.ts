@@ -61,10 +61,17 @@ export class Renderer {
 
   private computeTableBounds(windowW: number, windowH: number): void {
     const padding = 0.96;
-    const winAspect = windowW / windowH;
+
+    // Reserve space above the table for the HUD bar + theme label below it.
+    // HUD height is tableH * 0.065 + 4px gap + ~14px for the theme label line.
+    // Since tableH isn't known yet, estimate HUD needs as a fraction of windowH
+    // and shrink available height accordingly.
+    const hudReserve = windowH * 0.06;
+    const availH = windowH - hudReserve;
+    const winAspect = windowW / availH;
 
     if (winAspect > TABLE_ASPECT) {
-      this.tableH = windowH * padding;
+      this.tableH = availH * padding;
       this.tableW = this.tableH * TABLE_ASPECT;
     } else {
       this.tableW = windowW * padding;
@@ -72,7 +79,8 @@ export class Renderer {
     }
 
     this.tableX = (windowW - this.tableW) / 2;
-    this.tableY = (windowH - this.tableH) / 2;
+    // Center the table within the remaining space below the HUD reserve
+    this.tableY = hudReserve + (availH - this.tableH) / 2;
   }
 
   // ─── Coordinate Transforms ──────────────────────────────────────────────────

@@ -316,3 +316,178 @@ describe('isBallDrained', () => {
     expect(isBallDrained(ball)).toBe(false);
   });
 });
+
+// ─── Plunger lane — one-way wall ─────────────────────────────────────────────
+// The left wall of the plunger lane (PLUNGER_LANE_LEFT) only blocks a
+// non-inPlunger ball when velocity.x > 0 (drifting rightward into the lane).
+// A just-launched ball has velocity.x = 0 and must be allowed to travel up
+// the lane freely.
+
+describe('plunger lane — one-way wall', () => {
+  it('rejects a playfield ball drifting rightward into the lane', () => {
+    const ball = makeBall({
+      position: { x: TABLE.PLUNGER_LANE_LEFT + 0.005, y: 0.5 },
+      velocity: { x: 0.001, y: 0 },
+      inPlunger: false,
+    });
+    collideBallWalls(ball);
+    expect(ball.position.x + ball.radius).toBeLessThanOrEqual(TABLE.PLUNGER_LANE_LEFT + 1e-9);
+    expect(ball.velocity.x).toBeLessThan(0);
+  });
+
+  it('does not deflect a just-launched ball with velocity.x = 0', () => {
+    // A ball with zero x-velocity is in the lane right after launch — must not be pushed out.
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: 0.5 },
+      velocity: { x: 0, y: -0.003 },
+      inPlunger: false,
+    });
+    collideBallWalls(ball);
+    expect(ball.position.x).toBeCloseTo(TABLE.BALL_SPAWN_X, 5);
+    expect(ball.velocity.x).toBe(0);
+  });
+
+  it('does not push a ball already moving leftward out of the lane', () => {
+    // Once the top-rail redirect gives the ball negative x-velocity it should
+    // be free to cross the lane boundary into the playfield.
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: 0.5 },
+      velocity: { x: -0.002, y: 0.001 },
+      inPlunger: false,
+    });
+    const startX = ball.position.x;
+    collideBallWalls(ball);
+    expect(ball.position.x).toBeCloseTo(startX, 5);
+    expect(ball.velocity.x).toBeCloseTo(-0.002, 5);
+  });
+
+  it('keeps an inPlunger ball inside the lane if it drifts left', () => {
+    const ball = makeBall({
+      position: { x: TABLE.PLUNGER_LANE_LEFT - 0.005, y: 0.5 },
+      velocity: { x: -0.001, y: 0 },
+      inPlunger: true,
+    });
+    collideBallWalls(ball);
+    expect(ball.position.x - ball.radius).toBeGreaterThanOrEqual(TABLE.PLUNGER_LANE_LEFT - 1e-9);
+    expect(ball.velocity.x).toBeGreaterThan(0);
+  });
+
+  it('one-way wall is inactive above the lane exit threshold (y < 0.14)', () => {
+    // Above y = 0.14 the wall does not exist so the ball can arc into the playfield.
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: 0.10 },
+      velocity: { x: 0.001, y: -0.003 },
+      inPlunger: false,
+    });
+    collideBallWalls(ball);
+    expect(ball.position.x).toBeCloseTo(TABLE.BALL_SPAWN_X, 5);
+    expect(ball.velocity.x).toBeCloseTo(0.001, 5);
+  });
+});
+
+// ─── Plunger lane — lane floor ────────────────────────────────────────────────
+// The lane floor (LANE_FLOOR_Y) now catches any ball in the lane column,
+// not just inPlunger balls. This prevents a weakly-launched ball from draining.
+
+describe('plunger lane — lane floor', () => {
+  it('stops an inPlunger ball that reaches the lane floor', () => {
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: TABLE.LANE_FLOOR_Y + 0.01 },
+      velocity: { x: 0, y: 0.002 },
+      inPlunger: true,
+    });
+    collideBallWalls(ball);
+    expect(ball.position.y + ball.radius).toBeLessThanOrEqual(TABLE.LANE_FLOOR_Y + 1e-9);
+    expect(ball.velocity.y).toBeLessThanOrEqual(0);
+  });
+
+  it('stops a non-inPlunger ball that falls back to the lane floor', () => {
+    // A weakly-launched ball (inPlunger = false) must also be caught.
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: TABLE.LANE_FLOOR_Y + 0.01 },
+      velocity: { x: 0, y: 0.002 },
+      inPlunger: false,
+    });
+    collideBallWalls(ball);
+    expect(ball.position.y + ball.radius).toBeLessThanOrEqual(TABLE.LANE_FLOOR_Y + 1e-9);
+    expect(ball.velocity.y).toBeLessThanOrEqual(0);
+  });
+
+  it('does not apply the lane floor to a ball outside the lane column', () => {
+    // A ball at the same y but in the main playfield must not be stopped here.
+    const ball = makeBall({
+      position: { x: 0.5, y: TABLE.LANE_FLOOR_Y + 0.01 },
+      velocity: { x: 0, y: 0.002 },
+      inPlunger: false,
+    });
+    const startY = ball.position.y;
+    collideBallWalls(ball);
+    expect(ball.position.y).toBeCloseTo(startY, 5);
+  });
+});
+
+// ─── Plunger lane — launch sequence ──────────────────────────────────────────
+
+describe('plunger lane — launch sequence', () => {
+  it('a launched ball travels up the lane without x-deflection', () => {
+    // Simulates the ball leaving the plunger: velocity.x = 0, inPlunger = false.
+    // The one-way wall must not push it sideways on any frame.
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: TABLE.BALL_SPAWN_Y },
+      velocity: { x: 0, y: -MAX_PLUNGER_VELOCITY },
+      inPlunger: false,
+    });
+    for (let i = 0; i < 15; i++) {
+      stepBall(ball, 16);
+      collideBallWalls(ball);
+      if (ball.position.y <= 0.14) break; // exited lane exit zone
+    }
+    expect(ball.position.x).toBeCloseTo(TABLE.BALL_SPAWN_X, 3);
+    expect(ball.velocity.x).toBe(0);
+  });
+
+  it('top wall redirects a lane ball leftward into the playfield', () => {
+    // The curved top rail fires when the ball is in the lane (x > PLUNGER_LANE_LEFT).
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: TABLE.TOP_WALL - 0.01 },
+      velocity: { x: 0, y: -0.002 },
+      inPlunger: false,
+    });
+    collideBallWalls(ball);
+    expect(ball.velocity.x).toBeLessThan(0);       // redirected leftward
+    expect(ball.velocity.y).toBeGreaterThan(0);    // gentle downward component
+    expect(ball.position.y).toBeGreaterThanOrEqual(TABLE.TOP_WALL + ball.radius - 1e-9);
+  });
+
+  it('a weakly-launched ball is caught at the lane floor and does not drain', () => {
+    // Launch with a very low charge so the ball runs out of upward momentum
+    // and falls back before exiting.
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: TABLE.BALL_SPAWN_Y },
+      velocity: { x: 0, y: -MAX_PLUNGER_VELOCITY * 0.15 },
+      inPlunger: false,
+    });
+    for (let i = 0; i < 600; i++) {
+      stepBall(ball, 16);
+      collideBallWalls(ball);
+      if (isBallDrained(ball)) break;
+    }
+    expect(isBallDrained(ball)).toBe(false);
+    expect(ball.position.y + ball.radius).toBeLessThanOrEqual(TABLE.LANE_FLOOR_Y + 1e-9);
+  });
+
+  it('a full-strength launch exits the lane exit zone', () => {
+    const ball = makeBall({
+      position: { x: TABLE.BALL_SPAWN_X, y: TABLE.BALL_SPAWN_Y },
+      velocity: { x: 0, y: -MAX_PLUNGER_VELOCITY },
+      inPlunger: false,
+    });
+    let exitedLane = false;
+    for (let i = 0; i < 120; i++) {
+      stepBall(ball, 16);
+      collideBallWalls(ball);
+      if (ball.position.y < 0.14) { exitedLane = true; break; }
+    }
+    expect(exitedLane).toBe(true);
+  });
+});

@@ -69,7 +69,7 @@ export class InputManager {
       case 'ArrowLeft':
         this.state.leftFlipper = true;
         break;
-      case 'KeyX':
+      case 'Slash':
       case 'ArrowRight':
         this.state.rightFlipper = true;
         break;
@@ -92,7 +92,7 @@ export class InputManager {
       case 'ArrowLeft':
         this.state.leftFlipper = false;
         break;
-      case 'KeyX':
+      case 'Slash':
       case 'ArrowRight':
         this.state.rightFlipper = false;
         break;
