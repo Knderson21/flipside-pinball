@@ -211,35 +211,6 @@ export class Game {
       }
     }
 
-    // Detect any active ball that has rolled into the plunger lane and lock it
-    // to the spawn position. Works during single-ball play and multiball —
-    // other balls keep running while this one waits to be re-launched.
-    for (const ball of state.balls) {
-      if (!ball.active || ball.inPlunger) continue;
-      if (
-        ball.position.x > TABLE.PLUNGER_LANE_LEFT &&
-        ball.velocity.y > 0 &&
-        ball.position.y > 0.3
-      ) {
-        ball.inPlunger = true;
-        ball.velocity.x = 0;
-        ball.velocity.y = 0;
-        state.plunger = this.makePlunger();
-      }
-    }
-
-    // Service the lane ball: advance plunger charge and handle launch.
-    const laneBall = state.balls.find(b => b.active && b.inPlunger);
-    if (laneBall) {
-      updatePlunger(state.plunger, dtMs);
-      laneBall.position.x = TABLE.BALL_SPAWN_X;
-      laneBall.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
-      if (input.plungerJustReleased && state.plunger.charge > 0.02) {
-        launchBall(laneBall, state.plunger);
-        this.audio.play('launch');
-      }
-    }
-
     // Drain check — iterate backwards so splices are safe.
     // inPlunger balls are locked in the lane and cannot drain.
     for (let i = state.balls.length - 1; i >= 0; i--) {

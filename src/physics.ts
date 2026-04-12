@@ -68,7 +68,8 @@ export function collideBallWalls(ball: Ball): void {
     }
   }
 
-  if (ball.position.x > TABLE.PLUNGER_LANE_LEFT) {
+  // Lane floor — only applies while the ball is seated in the plunger lane.
+  if (ball.inPlunger && ball.position.x > TABLE.PLUNGER_LANE_LEFT) {
     if (ball.position.y + r > TABLE.LANE_FLOOR_Y) {
       ball.position.y = TABLE.LANE_FLOOR_Y - r;
       ball.velocity.y = -Math.abs(ball.velocity.y) * WALL_RESTITUTION * 0.25;
@@ -76,14 +77,19 @@ export function collideBallWalls(ball: Ball): void {
     }
   }
 
+  // Plunger lane left wall — one-way exit only.
+  // A ball seated in the lane (inPlunger) is kept inside; any other ball is
+  // immediately pushed back into the playfield so it can never re-enter the lane.
   const LANE_EXIT_Y = 0.14;
   if (ball.position.y > LANE_EXIT_Y) {
-    if (ball.position.x >= TABLE.PLUNGER_LANE_LEFT) {
+    if (ball.inPlunger) {
+      // Keep the lane ball inside the lane.
       if (ball.position.x - r < TABLE.PLUNGER_LANE_LEFT) {
         ball.position.x = TABLE.PLUNGER_LANE_LEFT + r;
         ball.velocity.x = Math.abs(ball.velocity.x) * WALL_RESTITUTION;
       }
     } else {
+      // One-way: push any playing ball that crossed into the lane back to the playfield.
       if (ball.position.x + r > TABLE.PLUNGER_LANE_LEFT) {
         ball.position.x = TABLE.PLUNGER_LANE_LEFT - r;
         ball.velocity.x = -Math.abs(ball.velocity.x) * WALL_RESTITUTION;
