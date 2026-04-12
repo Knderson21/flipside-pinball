@@ -221,6 +221,39 @@ export class Game {
       }
     }
 
+    // A ball that was launched but fell back to the lane floor (insufficient power)
+    // is returned to the plunger so the player can re-launch with no penalty.
+    for (const ball of state.balls) {
+      if (!ball.active || ball.inPlunger) continue;
+      if (
+        ball.position.x > TABLE.PLUNGER_LANE_LEFT &&
+        ball.position.y + ball.radius >= TABLE.LANE_FLOOR_Y - 0.01
+      ) {
+        ball.inPlunger = true;
+        ball.velocity.x = 0;
+        ball.velocity.y = 0;
+        state.plunger.charge = 0;
+        state.plunger.charging = false;
+        state.plunger.launched = false;
+      }
+    }
+
+    // Mid-play lane ball: animate the pull-back and handle re-launch.
+    // Mirrors the launching-phase logic so a returned ball can be re-shot.
+    const midPlayLaneBall = state.balls.find(b => b.active && b.inPlunger);
+    if (midPlayLaneBall) {
+      updatePlunger(state.plunger, dtMs);
+      midPlayLaneBall.position.x = TABLE.BALL_SPAWN_X;
+      midPlayLaneBall.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
+      midPlayLaneBall.velocity.x = 0;
+      midPlayLaneBall.velocity.y = 0;
+      const input = this.input.getState();
+      if (input.plungerJustReleased && state.plunger.charge > 0.02) {
+        launchBall(midPlayLaneBall, state.plunger);
+        this.audio.play('launch');
+      }
+    }
+
     // Transition to draining only when every ball (including any lane ball) is gone.
     if (state.balls.length === 0) {
       this.audio.play('drain');
