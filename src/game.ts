@@ -365,7 +365,7 @@ export class Game {
     }
 
     // Transition to draining only when every ball (including any lane ball) is gone.
-    if (state.balls.length === 0) {
+    if (state.balls.length === 0 && state.orbitBalls.length === 0) {
       this.audio.play('drain');
       state.ballsRemaining -= 1;
       state.phase = 'draining';
