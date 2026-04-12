@@ -4,6 +4,11 @@
 export const GRAVITY = 0.0000018;
 export const BALL_RADIUS = 0.025;
 export const BALL_MAX_SPEED = 0.003;
+// Sub-steps per frame for ball physics. At BALL_MAX_SPEED (0.003/ms) and the
+// 32ms frame cap, 4 substeps keep per-step movement (≤0.024) below both the
+// ball radius (0.025) and the flipper detection range (0.036), preventing
+// tunneling through flippers, slingshots, and wall segments.
+export const PHYSICS_SUBSTEPS = 4;
 export const WALL_RESTITUTION = 0.65;
 export const BUMPER_RESTITUTION = 1.15;
 export const FLIPPER_RESTITUTION = 0.75;
@@ -159,6 +164,8 @@ export interface SlingshotDef {
   v2: { x: number; y: number };
   /** Which edge (0=v0→v1, 1=v1→v2, 2=v2→v0) is the kick edge */
   kickEdge: number;
+  /** Which edge is the open bottom — no collision on this edge so the ball can roll underneath */
+  openEdge: number;
   score: number;
 }
 
@@ -169,6 +176,7 @@ export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
     v1: { x: 0.24, y: 0.83 },   // lower-right (near flipper)
     v2: { x: 0.10, y: 0.83 },   // lower-left (near wall)
     kickEdge: 0,                 // v0→v1 is the hypotenuse (playfield-facing)
+    openEdge: 1,                 // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
   {
@@ -177,6 +185,7 @@ export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
     v1: { x: 0.78, y: 0.83 },   // lower-right (near lane wall)
     v2: { x: 0.64, y: 0.83 },   // lower-left (near flipper)
     kickEdge: 2,                 // v2→v0 is the hypotenuse (playfield-facing)
+    openEdge: 1,                 // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
 ] as const;
@@ -185,18 +194,17 @@ export const SLINGSHOT_RESTITUTION = 1.10;
 export const SLINGSHOT_LIT_DURATION_MS = 200;
 
 // ─── Launch Lane Curve ────────────────────────────────────────────────────────
-// Inner rail of the curved launch lane. These segments guide the ball from the
-// top of the plunger lane leftward into the upper playfield. The outer boundary
-// is the existing top wall and right wall. The top-wall collision in physics.ts
-// provides the initial redirect; these segments constrain the ball's path after.
+// Outer rail of the curved launch lane. These segments trace the right wall
+// curving inward at the top-right corner, guiding the ball around the corner
+// and into the upper playfield. Approximates the quadratic Bezier from
+// (0.95, 0.14) through control point (0.95, 0.04) to (0.825, 0.04).
 
 export const LAUNCH_LANE_CURVE: ReadonlyArray<WallSegment> = [
-  { x1: 0.825, y1: 0.14,  x2: 0.82,  y2: 0.12 },
-  { x1: 0.82,  y1: 0.12,  x2: 0.81,  y2: 0.105 },
-  { x1: 0.81,  y1: 0.105, x2: 0.79,  y2: 0.095 },
-  { x1: 0.79,  y1: 0.095, x2: 0.75,  y2: 0.09 },
-  { x1: 0.75,  y1: 0.09,  x2: 0.68,  y2: 0.10 },
-  { x1: 0.68,  y1: 0.10,  x2: 0.60,  y2: 0.115 },
+  { x1: 0.950, y1: 0.140, x2: 0.945, y2: 0.104 },
+  { x1: 0.945, y1: 0.104, x2: 0.930, y2: 0.076 },
+  { x1: 0.930, y1: 0.076, x2: 0.905, y2: 0.056 },
+  { x1: 0.905, y1: 0.056, x2: 0.870, y2: 0.044 },
+  { x1: 0.870, y1: 0.044, x2: 0.825, y2: 0.040 },
 ];
 
 export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [

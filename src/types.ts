@@ -60,6 +60,8 @@ export interface Slingshot {
   /** Index (0, 1, or 2) of the edge that kicks with boosted restitution.
    *  Edge i connects vertices[i] to vertices[(i+1)%3]. */
   kickEdgeIndex: number;
+  /** Index of the open bottom edge — no collision on this edge so the ball can pass underneath. */
+  openEdgeIndex: number;
   scoreValue: number;
   lit: boolean;
   litTimer: number;

@@ -64,8 +64,8 @@ export function collideBallWalls(ball: Ball): void {
       // The launch lane curve segments in constants.ts provide additional
       // guidance as the ball travels across the upper playfield.
       const speed = length(ball.velocity);
-      ball.velocity.x = -speed * 0.92;
-      ball.velocity.y = speed * 0.25;
+      ball.velocity.x = -speed * 0.75;
+      ball.velocity.y = speed * 0.45;
     } else {
       ball.velocity.y = Math.abs(ball.velocity.y) * WALL_RESTITUTION;
     }
@@ -350,6 +350,7 @@ export function collideBallSlingshot(ball: Ball, slingshot: Slingshot): boolean 
   let hit = false;
 
   for (let i = 0; i < 3; i++) {
+    if (i === slingshot.openEdgeIndex) continue;
     const v1 = verts[i]!;
     const v2 = verts[(i + 1) % 3]!;
 

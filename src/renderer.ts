@@ -218,7 +218,7 @@ export class Renderer {
     }
     const { ctx } = this;
 
-    // Draw the inner rail of the curved launch lane
+    // Draw the outer rail of the curved launch lane (right wall curving inward)
     ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
@@ -227,15 +227,6 @@ export class Renderer {
     for (const seg of LAUNCH_LANE_CURVE) {
       ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
     }
-    ctx.stroke();
-
-    // Draw the outer rail (connecting right wall to top wall around the corner)
-    ctx.beginPath();
-    ctx.moveTo(this.sx(0.95), this.sy(0.14));
-    ctx.quadraticCurveTo(
-      this.sx(0.95), this.sy(0.04),
-      this.sx(0.825), this.sy(0.04),
-    );
     ctx.stroke();
   }
 

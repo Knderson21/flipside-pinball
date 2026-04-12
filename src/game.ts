@@ -17,6 +17,7 @@ import {
   LOCK_SCOOP,
   MISSION_BANNER_DURATION_MS,
   ORBIT,
+  PHYSICS_SUBSTEPS,
   ROLLOVER_RADIUS,
   SLINGSHOT_LIT_DURATION_MS,
   TABLE,
@@ -179,57 +180,64 @@ export class Game {
     const { state } = this;
 
     // Step and collide every active ball that is not held in the plunger lane.
+    // Sub-stepping prevents tunneling: at BALL_MAX_SPEED (0.003/ms) and the
+    // 32ms frame cap, each sub-step moves the ball at most 0.024 units — safely
+    // below the ball radius (0.025) and flipper detection range (0.036).
+    const subDt = dtMs / PHYSICS_SUBSTEPS;
     for (const ball of state.balls) {
       if (!ball.active || ball.inPlunger) continue;
-      stepBall(ball, dtMs);
-      collideBallWalls(ball);
 
-      for (const bumper of state.bumpers) {
-        const hit = collideBallBumper(ball, bumper);
-        if (hit) {
-          state.score += bumper.scoreValue * state.mission.multiplier;
-          bumper.lit = true;
-          bumper.litTimer = BUMPER_LIT_DURATION_MS;
-          this.audio.play('bumper');
+      for (let step = 0; step < PHYSICS_SUBSTEPS; step++) {
+        stepBall(ball, subDt);
+        collideBallWalls(ball);
+
+        for (const bumper of state.bumpers) {
+          const hit = collideBallBumper(ball, bumper);
+          if (hit) {
+            state.score += bumper.scoreValue * state.mission.multiplier;
+            bumper.lit = true;
+            bumper.litTimer = BUMPER_LIT_DURATION_MS;
+            this.audio.play('bumper');
+          }
         }
-      }
 
-      for (const t of state.dropTargets) {
-        if (collideBallDropTarget(ball, t)) {
-          state.score += t.scoreValue * state.mission.multiplier;
-          this.audio.play('dropTarget');
-          this.onDropTargetHit();
+        for (const t of state.dropTargets) {
+          if (collideBallDropTarget(ball, t)) {
+            state.score += t.scoreValue * state.mission.multiplier;
+            this.audio.play('dropTarget');
+            this.onDropTargetHit();
+          }
         }
-      }
 
-      for (const seg of GUIDE_WALLS) {
-        collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
-      }
-
-      for (const seg of LAUNCH_LANE_CURVE) {
-        collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
-      }
-
-      for (const sling of state.slingshots) {
-        if (collideBallSlingshot(ball, sling)) {
-          state.score += sling.scoreValue * state.mission.multiplier;
-          sling.lit = true;
-          sling.litTimer = SLINGSHOT_LIT_DURATION_MS;
-          this.audio.play('slingshot');
+        for (const seg of GUIDE_WALLS) {
+          collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
         }
-      }
 
-      for (const ro of state.rollovers) {
-        if (!ro.lit && checkRollover(ball, ro.position.x, ro.position.y, ROLLOVER_RADIUS)) {
-          ro.lit = true;
-          state.score += ro.scoreValue * state.mission.multiplier;
-          this.audio.play('rollover');
-          this.checkRolloversComplete();
+        for (const seg of LAUNCH_LANE_CURVE) {
+          collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
         }
-      }
 
-      collideBallFlipper(ball, state.flippers[0]);
-      collideBallFlipper(ball, state.flippers[1]);
+        for (const sling of state.slingshots) {
+          if (collideBallSlingshot(ball, sling)) {
+            state.score += sling.scoreValue * state.mission.multiplier;
+            sling.lit = true;
+            sling.litTimer = SLINGSHOT_LIT_DURATION_MS;
+            this.audio.play('slingshot');
+          }
+        }
+
+        for (const ro of state.rollovers) {
+          if (!ro.lit && checkRollover(ball, ro.position.x, ro.position.y, ROLLOVER_RADIUS)) {
+            ro.lit = true;
+            state.score += ro.scoreValue * state.mission.multiplier;
+            this.audio.play('rollover');
+            this.checkRolloversComplete();
+          }
+        }
+
+        collideBallFlipper(ball, state.flippers[0]);
+        collideBallFlipper(ball, state.flippers[1]);
+      }
     }
 
     // Check orbit entry — remove ball from normal physics and add to orbit transit
@@ -591,6 +599,7 @@ export class Game {
         { x: def.v2.x, y: def.v2.y },
       ],
       kickEdgeIndex: def.kickEdge,
+      openEdgeIndex: def.openEdge,
       scoreValue: def.score,
       lit: false,
       litTimer: 0,

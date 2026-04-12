@@ -569,6 +569,7 @@ function makeSlingshot(overrides: Partial<Slingshot> = {}): Slingshot {
       { x: 0.10, y: 0.83 },
     ],
     kickEdgeIndex: 0,
+    openEdgeIndex: 1,
     scoreValue: 50,
     lit: false,
     litTimer: 0,
