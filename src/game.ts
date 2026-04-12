@@ -166,7 +166,6 @@ export class Game {
 
   private updatePlaying(dtMs: number): void {
     const { state } = this;
-    const input = this.input.getState();
 
     // Step and collide every active ball that is not held in the plunger lane.
     for (const ball of state.balls) {
