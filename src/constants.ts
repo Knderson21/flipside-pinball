@@ -121,42 +121,66 @@ export const LOCK_SCOOP = {
   radius: 0.032,
 } as const;
 
-// ─── Orbit Shot ──────────────────────────────────────────────────────────────
-// An orbit loop across the upper playfield. When the ball enters the entry zone
-// with sufficient velocity, it's "warped" along the orbit path and deposited at
-// the exit point. This avoids complex channel collision physics.
+// ─── Orbit Lane ──────────────────────────────────────────────────────────────
+// A physical lane wrapping around the upper playfield. The ball travels through
+// it using real physics, bouncing between outer and inner walls. The inner wall
+// has a gap at the top so balls can fall through to the rollover area.
+// Both ends are open; orbit score is awarded on entry, with a bonus when the
+// ball enters one side and exits the other.
 
-export const ORBIT = {
-  entryX: 0.090,
-  entryY: 0.460,
-  entryRadius: 0.04,
-  /** Ball must be moving upward (negative vy) to enter */
-  minSpeed: 0.001,
-  exitX: 0.785,
-  exitY: 0.460,
-  exitVx: 0.0008,
-  exitVy: 0.001,
-  transitTimeMs: 600,
-  score: 500,
-  /** Polyline path for rendering and animation interpolation.
-   *  Wide arc centered at x=0.4375 (playfield center), symmetric about that axis.
-   *  Hugs ~0.04 inside LEFT_WALL (0.05) and PLUNGER_LANE_LEFT (0.825).
-   *  Entry/exit at y=0.460, apex at y≈0.065. */
-  path: [
-    { x: 0.090, y: 0.460 },   // entry (left)
-    { x: 0.080, y: 0.350 },   // up left wall
-    { x: 0.085, y: 0.240 },   // mid-left wall
-    { x: 0.110, y: 0.150 },   // upper-left corner approach
-    { x: 0.180, y: 0.090 },   // rounding top-left
-    { x: 0.300, y: 0.065 },   // along top
-    { x: 0.575, y: 0.065 },   // along top (mirror)
-    { x: 0.695, y: 0.090 },   // rounding top-right
-    { x: 0.765, y: 0.150 },   // upper-right corner approach
-    { x: 0.790, y: 0.240 },   // mid-right wall
-    { x: 0.795, y: 0.350 },   // down right wall
-    { x: 0.785, y: 0.460 },   // exit (right)
-  ] as ReadonlyArray<{ x: number; y: number }>,
-} as const;
+export const ORBIT_SCORE = 500;
+export const ORBIT_MIN_SPEED = 0.001;
+export const ORBIT_ENTRY_RADIUS = 0.04;
+
+// Entry/exit zones at the bottom of each side of the lane
+export const ORBIT_LEFT = { x: 0.090, y: 0.460 };
+export const ORBIT_RIGHT = { x: 0.785, y: 0.460 };
+
+// Outer wall — follows the perimeter of the lane (full loop, left to right)
+export const ORBIT_OUTER_WALLS: ReadonlyArray<WallSegment> = [
+  { x1: 0.090, y1: 0.460, x2: 0.080, y2: 0.350 },   // left entry → up
+  { x1: 0.080, y1: 0.350, x2: 0.085, y2: 0.240 },   // up left wall
+  { x1: 0.085, y1: 0.240, x2: 0.110, y2: 0.150 },   // mid-left
+  { x1: 0.110, y1: 0.150, x2: 0.180, y2: 0.090 },   // upper-left corner
+  { x1: 0.180, y1: 0.090, x2: 0.300, y2: 0.065 },   // rounding top-left
+  { x1: 0.300, y1: 0.065, x2: 0.575, y2: 0.065 },   // along top
+  { x1: 0.575, y1: 0.065, x2: 0.695, y2: 0.090 },   // rounding top-right
+  { x1: 0.695, y1: 0.090, x2: 0.765, y2: 0.150 },   // upper-right corner
+  { x1: 0.765, y1: 0.150, x2: 0.790, y2: 0.240 },   // mid-right
+  { x1: 0.790, y1: 0.240, x2: 0.795, y2: 0.350 },   // down right wall
+  { x1: 0.795, y1: 0.350, x2: 0.785, y2: 0.460 },   // right → exit
+];
+
+// Inner wall — offset ~0.06 inward from outer wall.
+// Gap between left and right sections at the top lets balls fall to rollovers.
+export const ORBIT_INNER_WALLS: ReadonlyArray<WallSegment> = [
+  // Left inner wall (entry up to gap)
+  { x1: 0.150, y1: 0.460, x2: 0.143, y2: 0.350 },
+  { x1: 0.143, y1: 0.350, x2: 0.148, y2: 0.240 },
+  { x1: 0.148, y1: 0.240, x2: 0.175, y2: 0.165 },
+  { x1: 0.175, y1: 0.165, x2: 0.230, y2: 0.120 },   // gap starts here
+  // Right inner wall (gap to exit)
+  { x1: 0.645, y1: 0.120, x2: 0.700, y2: 0.165 },   // gap ends here
+  { x1: 0.700, y1: 0.165, x2: 0.727, y2: 0.240 },
+  { x1: 0.727, y1: 0.240, x2: 0.732, y2: 0.350 },
+  { x1: 0.732, y1: 0.350, x2: 0.725, y2: 0.460 },
+];
+
+// Center path for rendering (dashed guide line)
+export const ORBIT_PATH: ReadonlyArray<{ x: number; y: number }> = [
+  { x: 0.090, y: 0.460 },
+  { x: 0.080, y: 0.350 },
+  { x: 0.085, y: 0.240 },
+  { x: 0.110, y: 0.150 },
+  { x: 0.180, y: 0.090 },
+  { x: 0.300, y: 0.065 },
+  { x: 0.575, y: 0.065 },
+  { x: 0.695, y: 0.090 },
+  { x: 0.765, y: 0.150 },
+  { x: 0.790, y: 0.240 },
+  { x: 0.795, y: 0.350 },
+  { x: 0.785, y: 0.460 },
+];
 
 // ─── Slingshot Layout ─────────────────────────────────────────────────────────
 // Triangular kickers above each flipper. The kick edge (hypotenuse) faces the

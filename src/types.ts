@@ -15,6 +15,10 @@ export interface Ball {
   active: boolean;
   /** true while this ball is locked in the plunger lane waiting to launch */
   inPlunger: boolean;
+  /** Which side the ball entered the orbit lane from. Set on entry, cleared on
+   *  exit or when the ball leaves the orbit area. Used to detect full orbit
+   *  traversals (enter one side, exit the other) for bonus scoring. */
+  orbitEnteredFrom?: 'left' | 'right';
 }
 
 export type FlipperSide = 'left' | 'right';
@@ -83,15 +87,6 @@ export interface Plunger {
 
 // ─── Mission / Mode State ─────────────────────────────────────────────────────
 
-export interface OrbitState {
-  /** The ball traveling through the orbit */
-  ball: Ball;
-  /** ms elapsed in transit */
-  timer: number;
-  /** Total transit time ms */
-  totalTime: number;
-}
-
 export type MissionPhase = 'idle' | 'active' | 'complete';
 
 export type LockPhase =
@@ -144,7 +139,6 @@ export interface GameState {
   slingshots: Slingshot[];
   rollovers: RolloverLane[];
   plunger: Plunger;
-  orbitBalls: OrbitState[];
   mission: MissionState;
   lastFrameTime: number;
   drainTimer: number;

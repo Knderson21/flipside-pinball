@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Ball, Bumper, DropTarget, Flipper, Plunger, Slingshot } from './types';
 import {
-  checkOrbitEntry,
+  checkOrbitZone,
   checkRollover,
   collideBallBumper,
   collideBallDropTarget,
@@ -621,15 +621,15 @@ describe('collideBallSlingshot', () => {
   });
 });
 
-// ─── checkOrbitEntry ────────────────────────────────────────────────────────
+// ─── checkOrbitZone ─────────────────────────────────────────────────────────
 
-describe('checkOrbitEntry', () => {
-  it('returns true when ball is in entry zone with upward velocity', () => {
+describe('checkOrbitZone', () => {
+  it('returns true when ball is in zone with upward velocity', () => {
     const ball = makeBall({
       position: { x: 0.12, y: 0.30 },
       velocity: { x: 0, y: -0.002 },
     });
-    expect(checkOrbitEntry(ball, 0.12, 0.30, 0.04, 0.001)).toBe(true);
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(true);
   });
 
   it('returns false when ball is moving downward', () => {
@@ -637,15 +637,15 @@ describe('checkOrbitEntry', () => {
       position: { x: 0.12, y: 0.30 },
       velocity: { x: 0, y: 0.002 },
     });
-    expect(checkOrbitEntry(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
   });
 
-  it('returns false when ball is outside entry zone', () => {
+  it('returns false when ball is outside zone', () => {
     const ball = makeBall({
       position: { x: 0.50, y: 0.50 },
       velocity: { x: 0, y: -0.002 },
     });
-    expect(checkOrbitEntry(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
   });
 
   it('returns false when ball speed is below minimum', () => {
@@ -653,14 +653,14 @@ describe('checkOrbitEntry', () => {
       position: { x: 0.12, y: 0.30 },
       velocity: { x: 0, y: -0.0005 },
     });
-    expect(checkOrbitEntry(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
   });
 
-  it('returns true when ball is at edge of entry zone with sufficient speed', () => {
+  it('returns true when ball is at edge of zone with sufficient speed', () => {
     const ball = makeBall({
       position: { x: 0.12 + 0.03, y: 0.30 },
       velocity: { x: -0.001, y: -0.001 },
     });
-    expect(checkOrbitEntry(ball, 0.12, 0.30, 0.04, 0.001)).toBe(true);
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(true);
   });
 });

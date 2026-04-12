@@ -299,17 +299,17 @@ export function collideBallSegment(
   return true;
 }
 
-// ─── Orbit Entry Detection ───────────────────────────────────────────────────
+// ─── Orbit Zone Detection ────────────────────────────────────────────────────
 
-export function checkOrbitEntry(
+/** Check if a ball is within an orbit entry/exit zone and moving upward fast enough. */
+export function checkOrbitZone(
   ball: Ball,
-  entryX: number, entryY: number, entryRadius: number,
+  zoneX: number, zoneY: number, zoneRadius: number,
   minSpeed: number,
 ): boolean {
-  const dx = ball.position.x - entryX;
-  const dy = ball.position.y - entryY;
-  if (dx * dx + dy * dy >= entryRadius * entryRadius) return false;
-  // Ball must be moving upward with sufficient speed
+  const dx = ball.position.x - zoneX;
+  const dy = ball.position.y - zoneY;
+  if (dx * dx + dy * dy >= zoneRadius * zoneRadius) return false;
   if (ball.velocity.y >= 0) return false;
   const spd = length(ball.velocity);
   return spd >= minSpeed;

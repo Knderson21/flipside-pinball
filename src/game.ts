@@ -1,4 +1,4 @@
-import type { Ball, Bumper, DropTarget, GameState, MissionState, OrbitState, Plunger, RolloverLane, Slingshot, ThemePack } from './types';
+import type { Ball, Bumper, DropTarget, GameState, MissionState, Plunger, RolloverLane, Slingshot, ThemePack } from './types';
 import {
   BALLS_PER_GAME,
   BALL_RADIUS,
@@ -16,14 +16,20 @@ import {
   BALLS_TO_LOCK,
   LOCK_SCOOP,
   MISSION_BANNER_DURATION_MS,
-  ORBIT,
+  ORBIT_ENTRY_RADIUS,
+  ORBIT_INNER_WALLS,
+  ORBIT_LEFT,
+  ORBIT_MIN_SPEED,
+  ORBIT_OUTER_WALLS,
+  ORBIT_RIGHT,
+  ORBIT_SCORE,
   PHYSICS_SUBSTEPS,
   ROLLOVER_RADIUS,
   SLINGSHOT_LIT_DURATION_MS,
   TABLE,
 } from './constants';
 import {
-  checkOrbitEntry,
+  checkOrbitZone,
   checkRollover,
   isBallInScoop,
   collideBallBumper,
@@ -217,6 +223,13 @@ export class Game {
           collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
         }
 
+        for (const seg of ORBIT_OUTER_WALLS) {
+          collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+        }
+        for (const seg of ORBIT_INNER_WALLS) {
+          collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+        }
+
         for (const sling of state.slingshots) {
           if (collideBallSlingshot(ball, sling)) {
             state.score += sling.scoreValue * state.mission.multiplier;
@@ -240,54 +253,45 @@ export class Game {
       }
     }
 
-    // Check orbit entry — remove ball from normal physics and add to orbit transit
-    for (let i = state.balls.length - 1; i >= 0; i--) {
-      const ball = state.balls[i]!;
+    // Orbit lane entry/exit detection — ball physically travels through the lane
+    // via wall collisions (handled above). Here we detect entry and award score.
+    for (const ball of state.balls) {
       if (!ball.active || ball.inPlunger) continue;
-      if (checkOrbitEntry(ball, ORBIT.entryX, ORBIT.entryY, ORBIT.entryRadius, ORBIT.minSpeed)) {
-        state.balls.splice(i, 1);
-        state.orbitBalls.push({
-          ball,
-          timer: 0,
-          totalTime: ORBIT.transitTimeMs,
-        });
-        state.score += ORBIT.score * state.mission.multiplier;
+
+      // Detect entry into left orbit zone
+      if (!ball.orbitEnteredFrom && checkOrbitZone(ball, ORBIT_LEFT.x, ORBIT_LEFT.y, ORBIT_ENTRY_RADIUS, ORBIT_MIN_SPEED)) {
+        ball.orbitEnteredFrom = 'left';
+        state.score += ORBIT_SCORE * state.mission.multiplier;
         this.audio.play('orbitShot');
         state.mission.bannerText = 'ORBIT!';
         state.mission.bannerTimer = 1200;
       }
-    }
 
-    // Animate orbit balls — interpolate position along orbit path
-    for (let i = state.orbitBalls.length - 1; i >= 0; i--) {
-      const ob = state.orbitBalls[i]!;
-      ob.timer += dtMs;
-      const t = ob.timer / ob.totalTime;
+      // Detect entry into right orbit zone
+      if (!ball.orbitEnteredFrom && checkOrbitZone(ball, ORBIT_RIGHT.x, ORBIT_RIGHT.y, ORBIT_ENTRY_RADIUS, ORBIT_MIN_SPEED)) {
+        ball.orbitEnteredFrom = 'right';
+        state.score += ORBIT_SCORE * state.mission.multiplier;
+        this.audio.play('orbitShot');
+        state.mission.bannerText = 'ORBIT!';
+        state.mission.bannerTimer = 1200;
+      }
 
-      if (t >= 1) {
-        // Exit orbit — return ball to normal physics at exit point
-        ob.ball.position.x = ORBIT.exitX;
-        ob.ball.position.y = ORBIT.exitY;
-        ob.ball.velocity.x = ORBIT.exitVx;
-        ob.ball.velocity.y = ORBIT.exitVy;
-        ob.ball.active = true;
-        state.balls.push(ob.ball);
-        state.orbitBalls.splice(i, 1);
-      } else {
-        // Interpolate position along orbit path using Catmull-Rom spline
-        const path = ORBIT.path;
-        const pathT = t * (path.length - 1);
-        const idx = Math.floor(pathT);
-        const frac = pathT - idx;
-        const pm1 = path[Math.max(idx - 1, 0)]!;
-        const p0 = path[idx]!;
-        const p1 = path[Math.min(idx + 1, path.length - 1)]!;
-        const p2 = path[Math.min(idx + 2, path.length - 1)]!;
-        // Catmull-Rom cubic: q(t) = 0.5 * ((2*p0) + (-pm1+p1)*t + (2pm1 -5p0 +4p1 -p2)*t^2 + (-pm1 +3p0 -3p1 +p2)*t^3)
-        const f2 = frac * frac;
-        const f3 = f2 * frac;
-        ob.ball.position.x = 0.5 * (2*p0.x + (-pm1.x+p1.x)*frac + (2*pm1.x -5*p0.x +4*p1.x -p2.x)*f2 + (-pm1.x +3*p0.x -3*p1.x +p2.x)*f3);
-        ob.ball.position.y = 0.5 * (2*p0.y + (-pm1.y+p1.y)*frac + (2*pm1.y -5*p0.y +4*p1.y -p2.y)*f2 + (-pm1.y +3*p0.y -3*p1.y +p2.y)*f3);
+      // Detect full orbit: ball exits the opposite side from where it entered
+      if (ball.orbitEnteredFrom === 'left' && checkOrbitZone(ball, ORBIT_RIGHT.x, ORBIT_RIGHT.y, ORBIT_ENTRY_RADIUS, ORBIT_MIN_SPEED)) {
+        state.score += ORBIT_SCORE * 2 * state.mission.multiplier;
+        state.mission.bannerText = 'FULL ORBIT!';
+        state.mission.bannerTimer = 1500;
+        ball.orbitEnteredFrom = undefined;
+      } else if (ball.orbitEnteredFrom === 'right' && checkOrbitZone(ball, ORBIT_LEFT.x, ORBIT_LEFT.y, ORBIT_ENTRY_RADIUS, ORBIT_MIN_SPEED)) {
+        state.score += ORBIT_SCORE * 2 * state.mission.multiplier;
+        state.mission.bannerText = 'FULL ORBIT!';
+        state.mission.bannerTimer = 1500;
+        ball.orbitEnteredFrom = undefined;
+      }
+
+      // Clear orbit tracking when ball drops well below the orbit lane
+      if (ball.orbitEnteredFrom && ball.position.y > 0.50) {
+        ball.orbitEnteredFrom = undefined;
       }
     }
 
@@ -370,7 +374,7 @@ export class Game {
     }
 
     // Transition to draining only when every ball (including any lane ball) is gone.
-    if (state.balls.length === 0 && state.orbitBalls.length === 0) {
+    if (state.balls.length === 0) {
       this.audio.play('drain');
       state.ballsRemaining -= 1;
       state.phase = 'draining';
@@ -519,7 +523,6 @@ export class Game {
       slingshots: this.makeSlingshots(),
       rollovers: this.makeRollovers(),
       plunger: this.makePlunger(),
-      orbitBalls: [],
       mission: this.makeMission(),
       lastFrameTime: performance.now(),
       drainTimer: 0,
@@ -536,7 +539,6 @@ export class Game {
     state.dropTargets = this.makeDropTargets();
     state.slingshots = this.makeSlingshots();
     state.rollovers = this.makeRollovers();
-    state.orbitBalls = [];
     state.mission = this.makeMission();
     this.resetToLaunching();
   }

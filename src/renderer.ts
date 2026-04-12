@@ -11,7 +11,7 @@ import type {
   Slingshot,
   ThemePack,
 } from './types';
-import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LAUNCH_LANE_CURVE, LOCK_SCOOP, ORBIT, TABLE, TABLE_ASPECT } from './constants';
+import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LAUNCH_LANE_CURVE, LOCK_SCOOP, ORBIT_INNER_WALLS, ORBIT_LEFT, ORBIT_OUTER_WALLS, ORBIT_RIGHT, TABLE, TABLE_ASPECT } from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
@@ -138,10 +138,6 @@ export class Renderer {
     this.drawFlippers(state.flippers, rc, palette);
     for (const ball of state.balls) {
       this.drawBall(ball, rc, palette);
-    }
-    // Draw orbit transit balls
-    for (const ob of state.orbitBalls) {
-      this.drawBall(ob.ball, rc, palette);
     }
     this.drawHUD(state, palette);
     this.drawMissionBanner(state, palette);
@@ -391,35 +387,33 @@ export class Renderer {
       return;
     }
     const { ctx } = this;
-    const path = ORBIT.path;
 
-    // Draw orbit rail as a smooth Catmull-Rom spline (converted to cubic Beziers)
+    // Draw outer walls (solid)
     ctx.strokeStyle = palette.orbitRailColor;
     ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(this.sx(path[0]!.x), this.sy(path[0]!.y));
-    for (let i = 0; i < path.length - 1; i++) {
-      const p0 = path[Math.max(i - 1, 0)]!;
-      const p1 = path[i]!;
-      const p2 = path[i + 1]!;
-      const p3 = path[Math.min(i + 2, path.length - 1)]!;
-      // Catmull-Rom tangents → cubic Bezier control points
-      const cp1x = this.sx(p1.x + (p2.x - p0.x) / 6);
-      const cp1y = this.sy(p1.y + (p2.y - p0.y) / 6);
-      const cp2x = this.sx(p2.x - (p3.x - p1.x) / 6);
-      const cp2y = this.sy(p2.y - (p3.y - p1.y) / 6);
-      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, this.sx(p2.x), this.sy(p2.y));
+    for (const seg of ORBIT_OUTER_WALLS) {
+      ctx.beginPath();
+      ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
+      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
+      ctx.stroke();
     }
-    ctx.stroke();
-    ctx.setLineDash([]);
 
-    // Entry indicator (small arrow)
-    const entryR = this.sl(ORBIT.entryRadius);
-    ctx.strokeStyle = palette.orbitRailColor;
+    // Draw inner walls (solid)
+    for (const seg of ORBIT_INNER_WALLS) {
+      ctx.beginPath();
+      ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
+      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
+      ctx.stroke();
+    }
+
+    // Entry/exit indicators (small circles at lane openings)
     ctx.lineWidth = 1.5;
+    const r = this.sl(0.015);
     ctx.beginPath();
-    ctx.arc(this.sx(ORBIT.entryX), this.sy(ORBIT.entryY), entryR, 0, Math.PI * 2);
+    ctx.arc(this.sx(ORBIT_LEFT.x), this.sy(ORBIT_LEFT.y), r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(this.sx(ORBIT_RIGHT.x), this.sy(ORBIT_RIGHT.y), r, 0, Math.PI * 2);
     ctx.stroke();
   }
 
