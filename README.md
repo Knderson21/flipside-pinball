@@ -25,7 +25,12 @@ Open [http://localhost:5173](http://localhost:5173).
 
 ## Features
 
-- **Multiball** — clear the three-target drop bank to trigger multiball and raise the score multiplier (up to ×5).
+- **Ball lock multiball** — light all 3 rollover lanes to activate lock, then lock 3 balls in the scoop to trigger multiball. A proper progression system inspired by real pinball tables.
+- **Slingshots** — triangular kickers above each flipper that add energy on contact, keeping the ball moving.
+- **Rollover lanes** — 3 pass-over switches in the upper playfield. Light all 3 to activate the ball lock.
+- **Orbit shot** — hit the left-side entry with enough speed and the ball warps across the upper playfield, exiting on the right.
+- **Curved launch lane** — the plunger lane curves around the top-right corner into the upper playfield, matching realistic pinball table design.
+- **Drop target bank** — 3 targets that award bonus points and raise the score multiplier (up to x5) when cleared.
 - **Live theme swap** — press `T` to cycle between Neon Arcade and Space Cadet. Palette, fonts, strings, sounds, and custom draw routines all swap instantly.
 - **Synthesized audio** — no asset files required. Sound events are defined per-theme and played through Web Audio oscillators.
 - **Responsive** — scales to any viewport using a normalized coordinate system; fills width in portrait, height in landscape.
@@ -54,8 +59,8 @@ npm run test:watch  # Vitest in watch mode
 
 ```
 src/
-  types.ts         — shared interfaces (Ball, Flipper, Bumper, DropTarget, MissionState, ThemePack, …)
-  constants.ts     — physics constants, table layout, default bumper/drop-target positions
+  types.ts         — shared interfaces (Ball, Flipper, Bumper, Slingshot, RolloverLane, OrbitState, ThemePack, …)
+  constants.ts     — physics constants, table layout, positions for bumpers, slingshots, rollovers, scoop, orbit
   theme.ts         — neonTheme, retroTheme, themes[] registry
   physics.ts       — pure collision / integration functions
   audio.ts         — AudioManager (Web Audio synth + URL playback)

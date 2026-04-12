@@ -1,14 +1,17 @@
 import type {
   Ball,
+  BallLockState,
   Bumper,
   ColorPalette,
   DropTarget,
   Flipper,
   GameState,
   RenderContext,
+  RolloverLane,
+  Slingshot,
   ThemePack,
 } from './types';
-import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, TABLE, TABLE_ASPECT } from './constants';
+import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LAUNCH_LANE_CURVE, LOCK_SCOOP, ORBIT, TABLE, TABLE_ASPECT } from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
@@ -125,11 +128,20 @@ export class Renderer {
     }
 
     this.drawPlungerLane(state, palette);
+    this.drawLaunchLaneCurve(rc, palette);
+    this.drawOrbit(rc, palette);
+    this.drawScoop(state.mission.lock, rc, palette);
     this.drawDropTargets(state.dropTargets, rc, palette);
+    this.drawRollovers(state.rollovers, rc, palette);
+    this.drawSlingshots(state.slingshots, rc, palette);
     this.drawBumpers(state.bumpers, rc, palette);
     this.drawFlippers(state.flippers, rc, palette);
     for (const ball of state.balls) {
       this.drawBall(ball, rc, palette);
+    }
+    // Draw orbit transit balls
+    for (const ob of state.orbitBalls) {
+      this.drawBall(ob.ball, rc, palette);
     }
     this.drawHUD(state, palette);
     this.drawMissionBanner(state, palette);
@@ -197,6 +209,36 @@ export class Renderer {
     }
   }
 
+  // ─── Launch Lane Curve ───────────────────────────────────────────────────────
+
+  private drawLaunchLaneCurve(rc: RenderContext, palette: ColorPalette): void {
+    if (this.theme.drawLaunchLane) {
+      this.theme.drawLaunchLane(rc, palette);
+      return;
+    }
+    const { ctx } = this;
+
+    // Draw the inner rail of the curved launch lane
+    ctx.strokeStyle = palette.wallColor;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    const first = LAUNCH_LANE_CURVE[0]!;
+    ctx.moveTo(this.sx(first.x1), this.sy(first.y1));
+    for (const seg of LAUNCH_LANE_CURVE) {
+      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
+    }
+    ctx.stroke();
+
+    // Draw the outer rail (connecting right wall to top wall around the corner)
+    ctx.beginPath();
+    ctx.moveTo(this.sx(0.95), this.sy(0.14));
+    ctx.quadraticCurveTo(
+      this.sx(0.95), this.sy(0.04),
+      this.sx(0.825), this.sy(0.04),
+    );
+    ctx.stroke();
+  }
+
   // ─── Plunger Lane ───────────────────────────────────────────────────────────
 
   private drawPlungerLane(state: GameState, palette: ColorPalette): void {
@@ -213,7 +255,8 @@ export class Renderer {
     ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(TABLE.TOP_WALL));
+    // Lane left wall stops at y=0.14 where the curved launch lane begins
+    ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(0.14));
     ctx.lineTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(TABLE.DRAIN_Y));
     ctx.stroke();
 
@@ -347,6 +390,175 @@ export class Renderer {
     ctx.strokeStyle = t.down ? palette.wallColor : palette.accent;
     ctx.lineWidth = t.down ? 1 : 2;
     ctx.strokeRect(x, y, w, h);
+  }
+
+  // ─── Orbit ──────────────────────────────────────────────────────────────────
+
+  private drawOrbit(rc: RenderContext, palette: ColorPalette): void {
+    if (this.theme.drawOrbit) {
+      this.theme.drawOrbit(rc, palette);
+      return;
+    }
+    const { ctx } = this;
+    const path = ORBIT.path;
+
+    // Draw orbit rail as a dashed path
+    ctx.strokeStyle = palette.orbitRailColor;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(this.sx(path[0]!.x), this.sy(path[0]!.y));
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(this.sx(path[i]!.x), this.sy(path[i]!.y));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Entry indicator (small arrow)
+    const entryR = this.sl(ORBIT.entryRadius);
+    ctx.strokeStyle = palette.orbitRailColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(this.sx(ORBIT.entryX), this.sy(ORBIT.entryY), entryR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // ─── Lock Scoop ─────────────────────────────────────────────────────────────
+
+  private drawScoop(lock: BallLockState, rc: RenderContext, palette: ColorPalette): void {
+    if (this.theme.drawScoop) {
+      this.theme.drawScoop(rc, lock, palette);
+      return;
+    }
+    const { ctx } = this;
+    const cx = this.sx(LOCK_SCOOP.x);
+    const cy = this.sy(LOCK_SCOOP.y);
+    const r = this.sl(LOCK_SCOOP.radius);
+    const isLit = lock.lockLit;
+
+    // Scoop pocket (semicircle opening upward)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI);
+    ctx.closePath();
+    ctx.fillStyle = isLit ? palette.scoopLitColor : palette.scoopColor;
+    ctx.globalAlpha = isLit ? 0.5 : 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = isLit ? palette.scoopLitColor : palette.wallColor;
+    ctx.lineWidth = isLit ? 3 : 2;
+    ctx.stroke();
+
+    // Glow when lit
+    if (isLit) {
+      const grd = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 2);
+      grd.addColorStop(0, 'rgba(0, 255, 200, 0.25)');
+      grd.addColorStop(1, 'rgba(0, 255, 200, 0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 2, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+
+    // Lock indicators (small dots showing how many balls are locked)
+    const dotR = Math.max(2, r * 0.18);
+    const dotSpacing = dotR * 3;
+    for (let i = 0; i < lock.ballsToLock; i++) {
+      const dx = cx + (i - (lock.ballsToLock - 1) / 2) * dotSpacing;
+      const dy = cy + r * 1.6;
+      ctx.beginPath();
+      ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = i < lock.ballsLocked
+        ? palette.lockIndicatorColor
+        : palette.scoopColor;
+      ctx.fill();
+    }
+  }
+
+  // ─── Rollovers ──────────────────────────────────────────────────────────────
+
+  private drawRollovers(rollovers: RolloverLane[], rc: RenderContext, palette: ColorPalette): void {
+    for (const ro of rollovers) {
+      if (this.theme.drawRollover) {
+        this.theme.drawRollover(rc, ro, palette);
+      } else {
+        this.drawDefaultRollover(ro, palette);
+      }
+    }
+  }
+
+  private drawDefaultRollover(ro: RolloverLane, palette: ColorPalette): void {
+    const { ctx } = this;
+    const cx = this.sx(ro.position.x);
+    const cy = this.sy(ro.position.y);
+    const r = this.sl(ro.radius);
+
+    // Diamond shape
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r * 0.6, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r * 0.6, cy);
+    ctx.closePath();
+
+    if (ro.lit) {
+      ctx.fillStyle = palette.rolloverLitColor;
+      ctx.fill();
+      // Glow
+      ctx.shadowColor = palette.rolloverLitColor;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = palette.rolloverColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // ─── Slingshots ──────────────────────────────────────────────────────────────
+
+  private drawSlingshots(slingshots: Slingshot[], rc: RenderContext, palette: ColorPalette): void {
+    for (const sling of slingshots) {
+      if (this.theme.drawSlingshot) {
+        this.theme.drawSlingshot(rc, sling, palette);
+      } else {
+        this.drawDefaultSlingshot(sling, palette);
+      }
+    }
+  }
+
+  private drawDefaultSlingshot(sling: Slingshot, palette: ColorPalette): void {
+    const { ctx } = this;
+    const [v0, v1, v2] = sling.vertices;
+
+    // Filled triangle
+    ctx.beginPath();
+    ctx.moveTo(this.sx(v0.x), this.sy(v0.y));
+    ctx.lineTo(this.sx(v1.x), this.sy(v1.y));
+    ctx.lineTo(this.sx(v2.x), this.sy(v2.y));
+    ctx.closePath();
+
+    ctx.fillStyle = sling.lit ? palette.slingshotLitColor : palette.slingshotColor;
+    ctx.globalAlpha = sling.lit ? 0.6 : 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Border
+    ctx.strokeStyle = palette.wallColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Highlight the kick edge with a thicker, brighter line
+    const ki = sling.kickEdgeIndex;
+    const kv1 = sling.vertices[ki]!;
+    const kv2 = sling.vertices[(ki + 1) % 3]!;
+    ctx.strokeStyle = sling.lit ? palette.accent : palette.slingshotColor;
+    ctx.lineWidth = sling.lit ? 4 : 3;
+    ctx.beginPath();
+    ctx.moveTo(this.sx(kv1.x), this.sy(kv1.y));
+    ctx.lineTo(this.sx(kv2.x), this.sy(kv2.y));
+    ctx.stroke();
   }
 
   // ─── Flippers ───────────────────────────────────────────────────────────────

@@ -53,6 +53,26 @@ export interface DropTarget {
   down: boolean;
 }
 
+export interface Slingshot {
+  id: string;
+  /** Three vertices of the triangle in normalized coords */
+  vertices: [Vec2, Vec2, Vec2];
+  /** Index (0, 1, or 2) of the edge that kicks with boosted restitution.
+   *  Edge i connects vertices[i] to vertices[(i+1)%3]. */
+  kickEdgeIndex: number;
+  scoreValue: number;
+  lit: boolean;
+  litTimer: number;
+}
+
+export interface RolloverLane {
+  id: string;
+  position: Vec2;
+  radius: number;
+  lit: boolean;
+  scoreValue: number;
+}
+
 export interface Plunger {
   charge: number;
   charging: boolean;
@@ -61,7 +81,32 @@ export interface Plunger {
 
 // ─── Mission / Mode State ─────────────────────────────────────────────────────
 
+export interface OrbitState {
+  /** The ball traveling through the orbit */
+  ball: Ball;
+  /** ms elapsed in transit */
+  timer: number;
+  /** Total transit time ms */
+  totalTime: number;
+}
+
 export type MissionPhase = 'idle' | 'active' | 'complete';
+
+export type LockPhase =
+  | 'idle'       // rollovers not yet completed
+  | 'lit'        // lock is lit, waiting for ball to enter scoop
+  | 'locked'     // at least one ball is locked, playing with new ball
+  | 'multiball'; // all balls released, multiball active
+
+export interface BallLockState {
+  phase: LockPhase;
+  /** How many balls are currently locked (0 to ballsToLock) */
+  ballsLocked: number;
+  /** Max balls to lock before multiball triggers */
+  ballsToLock: number;
+  /** Whether the scoop/lock area is visually lit (accepting balls) */
+  lockLit: boolean;
+}
 
 export interface MissionState {
   phase: MissionPhase;
@@ -72,6 +117,7 @@ export interface MissionState {
   /** ms remaining to show the "MULTIBALL!" banner */
   bannerTimer: number;
   bannerText: string;
+  lock: BallLockState;
 }
 
 // ─── Game Phases ──────────────────────────────────────────────────────────────
@@ -93,7 +139,10 @@ export interface GameState {
   flippers: [Flipper, Flipper];
   bumpers: Bumper[];
   dropTargets: DropTarget[];
+  slingshots: Slingshot[];
+  rollovers: RolloverLane[];
   plunger: Plunger;
+  orbitBalls: OrbitState[];
   mission: MissionState;
   lastFrameTime: number;
   drainTimer: number;
@@ -126,6 +175,14 @@ export interface ColorPalette {
   guideColor: string;
   /** Overlay fill behind the attract / gameover screens */
   overlay: string;
+  slingshotColor: string;
+  slingshotLitColor: string;
+  rolloverColor: string;
+  rolloverLitColor: string;
+  scoopColor: string;
+  scoopLitColor: string;
+  lockIndicatorColor: string;
+  orbitRailColor: string;
   /** Accent color for the mission banner */
   accent: string;
 }
@@ -160,6 +217,10 @@ export interface ThemeSounds {
   launch?: SoundDef;
   drain?: SoundDef;
   dropTarget?: SoundDef;
+  slingshot?: SoundDef;
+  rollover?: SoundDef;
+  lockBall?: SoundDef;
+  orbitShot?: SoundDef;
   missionComplete?: SoundDef;
   gameOver?: SoundDef;
 }
@@ -197,4 +258,9 @@ export interface ThemePack {
   drawBall?: (rc: RenderContext, ball: Ball, palette: ColorPalette) => void;
   drawFlipper?: (rc: RenderContext, flipper: Flipper, palette: ColorPalette) => void;
   drawDropTarget?: (rc: RenderContext, target: DropTarget, palette: ColorPalette) => void;
+  drawSlingshot?: (rc: RenderContext, slingshot: Slingshot, palette: ColorPalette) => void;
+  drawRollover?: (rc: RenderContext, rollover: RolloverLane, palette: ColorPalette) => void;
+  drawScoop?: (rc: RenderContext, lock: BallLockState, palette: ColorPalette) => void;
+  drawOrbit?: (rc: RenderContext, palette: ColorPalette) => void;
+  drawLaunchLane?: (rc: RenderContext, palette: ColorPalette) => void;
 }

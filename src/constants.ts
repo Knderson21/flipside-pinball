@@ -16,8 +16,8 @@ export const DRAIN_DELAY_MS = 1000;
 export const BALLS_PER_GAME = 3;
 export const HIGH_SCORE_KEY = 'pinball_high_score';
 
-// Mission
-export const MULTIBALL_BALLS = 2;              // extra balls spawned on mission complete
+// Ball Lock / Multiball
+export const BALLS_TO_LOCK = 3;               // balls that must be locked to trigger multiball
 export const MISSION_BANNER_DURATION_MS = 2500;
 export const DROP_TARGET_BONUS = 1000;         // base bonus for clearing a bank
 
@@ -87,6 +87,117 @@ export interface WallSegment {
   x2: number;
   y2: number;
 }
+
+// ─── Rollover Lane Layout ─────────────────────────────────────────────────────
+// Three rollover switches in the upper playfield. The ball passes over them
+// without bouncing. Lighting all three lights the ball lock for multiball.
+
+export interface RolloverDef {
+  x: number;
+  y: number;
+  score: number;
+}
+
+export const DEFAULT_ROLLOVERS: ReadonlyArray<RolloverDef> = [
+  { x: 0.25, y: 0.12, score: 25 },
+  { x: 0.42, y: 0.12, score: 25 },
+  { x: 0.59, y: 0.12, score: 25 },
+] as const;
+
+export const ROLLOVER_RADIUS = 0.022;
+
+// ─── Lock Scoop ──────────────────────────────────────────────────────────────
+// The ball lock scoop sits center-ish, below the bumper cluster and above the
+// drop targets. When the lock is lit, a ball entering the scoop is captured.
+
+export const LOCK_SCOOP = {
+  x: 0.50,
+  y: 0.48,
+  radius: 0.032,
+} as const;
+
+// ─── Orbit Shot ──────────────────────────────────────────────────────────────
+// An orbit loop across the upper playfield. When the ball enters the entry zone
+// with sufficient velocity, it's "warped" along the orbit path and deposited at
+// the exit point. This avoids complex channel collision physics.
+
+export const ORBIT = {
+  entryX: 0.12,
+  entryY: 0.30,
+  entryRadius: 0.04,
+  /** Ball must be moving upward (negative vy) to enter */
+  minSpeed: 0.001,
+  exitX: 0.75,
+  exitY: 0.30,
+  exitVx: 0.0008,
+  exitVy: 0.001,
+  transitTimeMs: 400,
+  score: 500,
+  /** Polyline path for rendering and animation interpolation */
+  path: [
+    { x: 0.12, y: 0.30 },
+    { x: 0.10, y: 0.22 },
+    { x: 0.12, y: 0.14 },
+    { x: 0.20, y: 0.08 },
+    { x: 0.35, y: 0.05 },
+    { x: 0.50, y: 0.04 },
+    { x: 0.65, y: 0.05 },
+    { x: 0.73, y: 0.10 },
+    { x: 0.76, y: 0.20 },
+    { x: 0.75, y: 0.30 },
+  ] as ReadonlyArray<{ x: number; y: number }>,
+} as const;
+
+// ─── Slingshot Layout ─────────────────────────────────────────────────────────
+// Triangular kickers above each flipper. The kick edge (hypotenuse) faces the
+// playfield and adds energy on contact (restitution > 1). The other two edges
+// are passive walls with normal restitution.
+
+export interface SlingshotDef {
+  v0: { x: number; y: number };
+  v1: { x: number; y: number };
+  v2: { x: number; y: number };
+  /** Which edge (0=v0→v1, 1=v1→v2, 2=v2→v0) is the kick edge */
+  kickEdge: number;
+  score: number;
+}
+
+export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
+  {
+    // Left slingshot: between left wall and left flipper
+    v0: { x: 0.10, y: 0.70 },   // upper corner (near wall)
+    v1: { x: 0.24, y: 0.83 },   // lower-right (near flipper)
+    v2: { x: 0.10, y: 0.83 },   // lower-left (near wall)
+    kickEdge: 0,                 // v0→v1 is the hypotenuse (playfield-facing)
+    score: 50,
+  },
+  {
+    // Right slingshot: between right flipper and plunger lane
+    v0: { x: 0.78, y: 0.70 },   // upper corner (near lane wall)
+    v1: { x: 0.78, y: 0.83 },   // lower-right (near lane wall)
+    v2: { x: 0.64, y: 0.83 },   // lower-left (near flipper)
+    kickEdge: 2,                 // v2→v0 is the hypotenuse (playfield-facing)
+    score: 50,
+  },
+] as const;
+
+export const SLINGSHOT_RESTITUTION = 1.10;
+export const SLINGSHOT_LIT_DURATION_MS = 200;
+
+// ─── Launch Lane Curve ────────────────────────────────────────────────────────
+// Inner rail of the curved launch lane. These segments guide the ball from the
+// top of the plunger lane leftward into the upper playfield. The outer boundary
+// is the existing top wall and right wall. The top-wall collision in physics.ts
+// provides the initial redirect; these segments constrain the ball's path after.
+
+export const LAUNCH_LANE_CURVE: ReadonlyArray<WallSegment> = [
+  { x1: 0.825, y1: 0.14,  x2: 0.82,  y2: 0.12 },
+  { x1: 0.82,  y1: 0.12,  x2: 0.81,  y2: 0.105 },
+  { x1: 0.81,  y1: 0.105, x2: 0.79,  y2: 0.095 },
+  { x1: 0.79,  y1: 0.095, x2: 0.75,  y2: 0.09 },
+  { x1: 0.75,  y1: 0.09,  x2: 0.68,  y2: 0.10 },
+  { x1: 0.68,  y1: 0.10,  x2: 0.60,  y2: 0.115 },
+];
 
 export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [
   // Upper inlane guides — endpoints stop 0.02 units ABOVE each flipper pivot.

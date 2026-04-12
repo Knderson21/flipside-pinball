@@ -1,4 +1,4 @@
-import type { Ball, Bumper, DropTarget, GameState, MissionState, Plunger, ThemePack } from './types';
+import type { Ball, Bumper, DropTarget, GameState, MissionState, OrbitState, Plunger, RolloverLane, Slingshot, ThemePack } from './types';
 import {
   BALLS_PER_GAME,
   BALL_RADIUS,
@@ -6,19 +6,30 @@ import {
   BUMPER_RADIUS,
   DEFAULT_BUMPERS,
   DEFAULT_DROP_TARGETS,
+  DEFAULT_ROLLOVERS,
+  DEFAULT_SLINGSHOTS,
   DRAIN_DELAY_MS,
   DROP_TARGET_BONUS,
   GUIDE_WALLS,
   HIGH_SCORE_KEY,
+  LAUNCH_LANE_CURVE,
+  BALLS_TO_LOCK,
+  LOCK_SCOOP,
   MISSION_BANNER_DURATION_MS,
-  MULTIBALL_BALLS,
+  ORBIT,
+  ROLLOVER_RADIUS,
+  SLINGSHOT_LIT_DURATION_MS,
   TABLE,
 } from './constants';
 import {
+  checkOrbitEntry,
+  checkRollover,
+  isBallInScoop,
   collideBallBumper,
   collideBallDropTarget,
   collideBallFlipper,
   collideBallSegment,
+  collideBallSlingshot,
   collideBallWalls,
   isBallDrained,
   launchBall,
@@ -195,17 +206,97 @@ export class Game {
         collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
       }
 
+      for (const seg of LAUNCH_LANE_CURVE) {
+        collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+      }
+
+      for (const sling of state.slingshots) {
+        if (collideBallSlingshot(ball, sling)) {
+          state.score += sling.scoreValue * state.mission.multiplier;
+          sling.lit = true;
+          sling.litTimer = SLINGSHOT_LIT_DURATION_MS;
+          this.audio.play('slingshot');
+        }
+      }
+
+      for (const ro of state.rollovers) {
+        if (!ro.lit && checkRollover(ball, ro.position.x, ro.position.y, ROLLOVER_RADIUS)) {
+          ro.lit = true;
+          state.score += ro.scoreValue * state.mission.multiplier;
+          this.audio.play('rollover');
+          this.checkRolloversComplete();
+        }
+      }
+
       collideBallFlipper(ball, state.flippers[0]);
       collideBallFlipper(ball, state.flippers[1]);
     }
 
-    // Tick bumper lit timers once per frame.
+    // Check orbit entry — remove ball from normal physics and add to orbit transit
+    for (let i = state.balls.length - 1; i >= 0; i--) {
+      const ball = state.balls[i]!;
+      if (!ball.active || ball.inPlunger) continue;
+      if (checkOrbitEntry(ball, ORBIT.entryX, ORBIT.entryY, ORBIT.entryRadius, ORBIT.minSpeed)) {
+        state.balls.splice(i, 1);
+        state.orbitBalls.push({
+          ball,
+          timer: 0,
+          totalTime: ORBIT.transitTimeMs,
+        });
+        state.score += ORBIT.score * state.mission.multiplier;
+        this.audio.play('orbitShot');
+        state.mission.bannerText = 'ORBIT!';
+        state.mission.bannerTimer = 1200;
+      }
+    }
+
+    // Animate orbit balls — interpolate position along orbit path
+    for (let i = state.orbitBalls.length - 1; i >= 0; i--) {
+      const ob = state.orbitBalls[i]!;
+      ob.timer += dtMs;
+      const t = ob.timer / ob.totalTime;
+
+      if (t >= 1) {
+        // Exit orbit — return ball to normal physics at exit point
+        ob.ball.position.x = ORBIT.exitX;
+        ob.ball.position.y = ORBIT.exitY;
+        ob.ball.velocity.x = ORBIT.exitVx;
+        ob.ball.velocity.y = ORBIT.exitVy;
+        ob.ball.active = true;
+        state.balls.push(ob.ball);
+        state.orbitBalls.splice(i, 1);
+      } else {
+        // Interpolate position along orbit path
+        const path = ORBIT.path;
+        const pathT = t * (path.length - 1);
+        const idx = Math.floor(pathT);
+        const frac = pathT - idx;
+        const p0 = path[idx]!;
+        const p1 = path[Math.min(idx + 1, path.length - 1)]!;
+        ob.ball.position.x = p0.x + (p1.x - p0.x) * frac;
+        ob.ball.position.y = p0.y + (p1.y - p0.y) * frac;
+      }
+    }
+
+    // Check ball lock scoop — must happen after all collisions
+    this.checkLockScoop();
+
+    // Tick bumper and slingshot lit timers once per frame.
     for (const bumper of state.bumpers) {
       if (bumper.lit) {
         bumper.litTimer -= dtMs;
         if (bumper.litTimer <= 0) {
           bumper.lit = false;
           bumper.litTimer = 0;
+        }
+      }
+    }
+    for (const sling of state.slingshots) {
+      if (sling.lit) {
+        sling.litTimer -= dtMs;
+        if (sling.litTimer <= 0) {
+          sling.lit = false;
+          sling.litTimer = 0;
         }
       }
     }
@@ -254,6 +345,17 @@ export class Game {
       }
     }
 
+    // Multiball end: when only 1 ball remains during multiball, reset lock state.
+    if (state.mission.lock.phase === 'multiball') {
+      const activeBalls = state.balls.filter(b => b.active && !b.inPlunger).length;
+      if (activeBalls <= 1) {
+        state.mission.lock.phase = 'idle';
+        state.mission.lock.ballsLocked = 0;
+        state.mission.lock.lockLit = false;
+        state.mission.multiplier = 1;
+      }
+    }
+
     // Transition to draining only when every ball (including any lane ball) is gone.
     if (state.balls.length === 0) {
       this.audio.play('drain');
@@ -261,6 +363,10 @@ export class Game {
       state.phase = 'draining';
       state.drainTimer = 0;
       state.mission.multiplier = 1;
+      // Reset lock state on drain
+      state.mission.lock.phase = 'idle';
+      state.mission.lock.ballsLocked = 0;
+      state.mission.lock.lockLit = false;
     }
   }
 
@@ -286,19 +392,13 @@ export class Game {
     const allDown = state.dropTargets.every(t => t.down);
     if (!allDown) return;
 
-    // Bank cleared! Award bonus, raise multiplier, start multiball, reset targets.
+    // Bank cleared! Award bonus and raise multiplier. No longer triggers multiball
+    // — multiball is now driven by the ball lock system.
     state.mission.banksCleared += 1;
     state.mission.multiplier = Math.min(state.mission.multiplier + 1, 5);
     state.score += DROP_TARGET_BONUS * state.mission.banksCleared;
 
-    const inMultiball = state.balls.filter(b => b.active).length > 1;
-
-    if (inMultiball) {
-      state.mission.bannerText = 'BANK CLEAR!';
-    } else {
-      state.mission.bannerText = 'MULTIBALL!';
-      this.spawnMultiball();
-    }
+    state.mission.bannerText = 'BANK CLEAR!';
     state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
     state.mission.phase = 'complete';
     this.audio.play('missionComplete');
@@ -307,17 +407,82 @@ export class Game {
     for (const t of state.dropTargets) t.down = false;
   }
 
-  private spawnMultiball(): void {
-    const { state } = this;
-    // Use an existing live ball as the seed position (first active one we find).
-    const seed = state.balls.find(b => b.active && !b.inPlunger) ?? state.balls[0];
-    if (!seed) return;
+  // ─── Ball Lock / Multiball System ───────────────────────────────────────────
 
-    for (let i = 0; i < MULTIBALL_BALLS; i++) {
-      const angle = -Math.PI / 2 + (i - (MULTIBALL_BALLS - 1) / 2) * 0.6;
+  /** Called when a rollover is lit — checks if all rollovers are complete. */
+  private checkRolloversComplete(): void {
+    const { state } = this;
+    if (state.mission.lock.phase !== 'idle') return;
+    if (!state.rollovers.every(r => r.lit)) return;
+
+    // All rollovers lit — light the lock!
+    state.mission.lock.phase = 'lit';
+    state.mission.lock.lockLit = true;
+    state.mission.bannerText = 'LOCK IS LIT';
+    state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
+    this.audio.play('missionComplete');
+
+    // Reset rollovers for next cycle
+    for (const r of state.rollovers) r.lit = false;
+  }
+
+  /** Per-frame check: is any active ball inside the lock scoop? */
+  private checkLockScoop(): void {
+    const { state } = this;
+    const lock = state.mission.lock;
+    // Only capture when lock is lit or in locked phase (accumulating more locks)
+    if (lock.phase !== 'lit' && lock.phase !== 'locked') return;
+
+    for (let i = state.balls.length - 1; i >= 0; i--) {
+      const ball = state.balls[i]!;
+      if (!ball.active || ball.inPlunger) continue;
+      if (!isBallInScoop(ball, LOCK_SCOOP.x, LOCK_SCOOP.y, LOCK_SCOOP.radius)) continue;
+
+      // Ball captured!
+      ball.active = false;
+      state.balls.splice(i, 1);
+      lock.ballsLocked += 1;
+
+      if (lock.ballsLocked >= lock.ballsToLock) {
+        // All balls locked — trigger multiball!
+        this.triggerMultiball();
+      } else {
+        // Ball locked, serve a new ball (does NOT consume ballsRemaining)
+        lock.phase = 'locked';
+        state.mission.bannerText = `BALL ${lock.ballsLocked} LOCKED`;
+        state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
+        this.audio.play('lockBall');
+        this.serveLockBall();
+      }
+      return; // only lock one ball per frame
+    }
+  }
+
+  /** Serve a new ball into the plunger lane after a lock (no ballsRemaining cost). */
+  private serveLockBall(): void {
+    const newBall = this.makeBall();
+    this.state.balls.push(newBall);
+    this.state.plunger = this.makePlunger();
+  }
+
+  /** Release all locked balls + current ball = multiball. */
+  private triggerMultiball(): void {
+    const { state } = this;
+    const lock = state.mission.lock;
+    lock.phase = 'multiball';
+    lock.lockLit = false;
+
+    state.mission.bannerText = 'MULTIBALL!';
+    state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
+    this.audio.play('missionComplete');
+
+    // Spawn ballsToLock balls spread across the playfield
+    const spawnCount = lock.ballsToLock;
+    for (let i = 0; i < spawnCount; i++) {
+      const angle = -Math.PI / 2 + (i - (spawnCount - 1) / 2) * 0.5;
       const speed = 0.0018;
       state.balls.push({
-        position: { x: seed.position.x, y: seed.position.y },
+        position: { x: 0.40 + i * 0.10, y: 0.35 },
         velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
         radius: BALL_RADIUS,
         active: true,
@@ -338,7 +503,10 @@ export class Game {
       flippers: [makeLeftFlipper(), makeRightFlipper()],
       bumpers: this.makeBumpers(),
       dropTargets: this.makeDropTargets(),
+      slingshots: this.makeSlingshots(),
+      rollovers: this.makeRollovers(),
       plunger: this.makePlunger(),
+      orbitBalls: [],
       mission: this.makeMission(),
       lastFrameTime: performance.now(),
       drainTimer: 0,
@@ -353,6 +521,9 @@ export class Game {
     state.flippers[1] = makeRightFlipper();
     state.bumpers = this.makeBumpers();
     state.dropTargets = this.makeDropTargets();
+    state.slingshots = this.makeSlingshots();
+    state.rollovers = this.makeRollovers();
+    state.orbitBalls = [];
     state.mission = this.makeMission();
     this.resetToLaunching();
   }
@@ -401,6 +572,31 @@ export class Game {
     }));
   }
 
+  private makeRollovers(): RolloverLane[] {
+    return DEFAULT_ROLLOVERS.map((def, i) => ({
+      id: `rollover-${i}`,
+      position: { x: def.x, y: def.y },
+      radius: ROLLOVER_RADIUS,
+      lit: false,
+      scoreValue: def.score,
+    }));
+  }
+
+  private makeSlingshots(): Slingshot[] {
+    return DEFAULT_SLINGSHOTS.map((def, i) => ({
+      id: `slingshot-${i}`,
+      vertices: [
+        { x: def.v0.x, y: def.v0.y },
+        { x: def.v1.x, y: def.v1.y },
+        { x: def.v2.x, y: def.v2.y },
+      ],
+      kickEdgeIndex: def.kickEdge,
+      scoreValue: def.score,
+      lit: false,
+      litTimer: 0,
+    }));
+  }
+
   private makeMission(): MissionState {
     return {
       phase: 'idle',
@@ -408,6 +604,12 @@ export class Game {
       multiplier: 1,
       bannerTimer: 0,
       bannerText: '',
+      lock: {
+        phase: 'idle',
+        ballsLocked: 0,
+        ballsToLock: BALLS_TO_LOCK,
+        lockLit: false,
+      },
     };
   }
 
