@@ -3,15 +3,15 @@
 
 export const GRAVITY = 0.0000018;
 export const BALL_RADIUS = 0.025;
-export const BALL_MAX_SPEED = 0.003;
+export const BALL_MAX_SPEED = 0.0025;
 // Sub-steps per frame for ball physics. At BALL_MAX_SPEED (0.003/ms) and the
 // 32ms frame cap, 4 substeps keep per-step movement (≤0.024) below both the
 // ball radius (0.025) and the flipper detection range (0.036), preventing
 // tunneling through flippers, slingshots, and wall segments.
 export const PHYSICS_SUBSTEPS = 4;
-export const WALL_RESTITUTION = 0.65;
-export const BUMPER_RESTITUTION = 1.15;
-export const FLIPPER_RESTITUTION = 0.75;
+export const WALL_RESTITUTION = 0.55;
+export const BUMPER_RESTITUTION = 1.08;
+export const FLIPPER_RESTITUTION = 0.65;
 export const FLIPPER_ANGULAR_SPEED = 0.018;
 export const FLIPPER_THICKNESS = 0.022;
 export const MAX_PLUNGER_CHARGE_MS = 1500;
@@ -57,11 +57,11 @@ export const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + 0.45;
 // ─── Default Bumper Layout ────────────────────────────────────────────────────
 
 export const DEFAULT_BUMPERS: ReadonlyArray<{ x: number; y: number; score: number }> = [
-  { x: 0.460, y: 0.20, score: 100 },
-  { x: 0.301, y: 0.28, score: 100 },
-  { x: 0.619, y: 0.28, score: 100 },
-  { x: 0.354, y: 0.38, score: 75 },
-  { x: 0.566, y: 0.38, score: 75 },
+  { x: 0.485, y: 0.19, score: 100 },
+  { x: 0.285, y: 0.28, score: 100 },
+  { x: 0.685, y: 0.28, score: 100 },
+  { x: 0.365, y: 0.37, score: 75 },
+  { x: 0.605, y: 0.37, score: 75 },
 ] as const;
 
 export const BUMPER_RADIUS = 0.045;
@@ -79,9 +79,10 @@ export interface DropTargetDef {
 }
 
 export const DEFAULT_DROP_TARGETS: ReadonlyArray<DropTargetDef> = [
-  { x: 0.354, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
-  { x: 0.460, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
-  { x: 0.566, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.275, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.415, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.555, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.695, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
 ] as const;
 
 // ─── Guide Wall Segments ──────────────────────────────────────────────────────
@@ -104,9 +105,10 @@ export interface RolloverDef {
 }
 
 export const DEFAULT_ROLLOVERS: ReadonlyArray<RolloverDef> = [
-  { x: 0.280, y: 0.12, score: 25 },
-  { x: 0.460, y: 0.12, score: 25 },
-  { x: 0.640, y: 0.12, score: 25 },
+  { x: 0.230, y: 0.12, score: 25 },
+  { x: 0.410, y: 0.12, score: 25 },
+  { x: 0.590, y: 0.12, score: 25 },
+  { x: 0.770, y: 0.12, score: 25 },
 ] as const;
 
 export const ROLLOVER_RADIUS = 0.022;
@@ -116,7 +118,7 @@ export const ROLLOVER_RADIUS = 0.022;
 // drop targets. When the lock is lit, a ball entering the scoop is captured.
 
 export const LOCK_SCOOP = {
-  x: 0.460,
+  x: 0.485,
   y: 0.48,
   radius: 0.032,
 } as const;
@@ -238,7 +240,7 @@ export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
   },
 ] as const;
 
-export const SLINGSHOT_RESTITUTION = 1.10;
+export const SLINGSHOT_RESTITUTION = 1.05;
 export const SLINGSHOT_LIT_DURATION_MS = 200;
 
 export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [
