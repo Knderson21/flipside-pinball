@@ -9,11 +9,11 @@ export const BALL_MAX_SPEED = 0.0025;
 // ball radius (0.025) and the flipper detection range (0.036), preventing
 // tunneling through flippers, slingshots, and wall segments.
 export const PHYSICS_SUBSTEPS = 4;
-export const WALL_RESTITUTION = 0.55;
+export const WALL_RESTITUTION = 0.40;
 export const BUMPER_RESTITUTION = 1.08;
-export const FLIPPER_RESTITUTION = 0.65;
+export const FLIPPER_RESTITUTION = 0.40;
 export const FLIPPER_ANGULAR_SPEED = 0.018;
-export const FLIPPER_THICKNESS = 0.022;
+export const FLIPPER_THICKNESS = 0.042;
 export const MAX_PLUNGER_CHARGE_MS = 1500;
 export const MAX_PLUNGER_VELOCITY = 0.004;
 export const BUMPER_LIT_DURATION_MS = 300;
@@ -38,8 +38,8 @@ export const TABLE = {
   PLUNGER_LANE_LEFT: 0.870,
 
   FLIPPER_Y: 0.87,
-  LEFT_FLIPPER_X: 0.251,
-  RIGHT_FLIPPER_X: 0.669,
+  LEFT_FLIPPER_X: 0.226,
+  RIGHT_FLIPPER_X: 0.694,
 
   BALL_SPAWN_X: 0.910,
   BALL_SPAWN_Y: 0.84,
@@ -218,24 +218,26 @@ export interface SlingshotDef {
 export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
   {
     // Left slingshot: between left wall and left flipper
-    // Wall-side at x=0.124 leaves ~0.074 gap from LEFT_WALL (0.05) for ball to pass behind.
-    // Bottom corner (v2) raised to y=0.78 so ball can roll underneath.
-    v0: { x: 0.124, y: 0.68 },   // upper corner (near wall)
-    v1: { x: 0.230, y: 0.7916 },   // lower-right (near flipper)
-    v2: { x: 0.124, y: 0.76 },   // lower-left (near wall) — raised to open bottom passage
-    kickEdge: 0,                  // v0→v1 is the hypotenuse (playfield-facing)
-    openEdge: 1,                  // v1→v2 is the open bottom — ball rolls freely underneath
+    // Wall-side at x=0.139 leaves ~0.089 gap from LEFT_WALL (0.05) for ball to pass behind.
+    // Raised 0.015 units and shifted 0.015 inward from walls for more passage room below and behind.
+    // Bottom corner (v2) raised so ball can roll underneath.
+    v0: { x: 0.139, y: 0.665 },   // upper corner (near wall)
+    v1: { x: 0.230, y: 0.7766 },  // lower-right (near flipper)
+    v2: { x: 0.139, y: 0.745 },   // lower-left (near wall) — raised to open bottom passage
+    kickEdge: 0,                   // v0→v1 is the hypotenuse (playfield-facing)
+    openEdge: 1,                   // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
   {
     // Right slingshot: between right flipper and plunger lane
-    // Wall-side at x=0.796 leaves ~0.074 gap from PLUNGER_LANE_LEFT (0.870) for ball to pass behind.
-    // Bottom corner (v1) raised to y=0.78 so ball can roll underneath.
-    v0: { x: 0.796, y: 0.68 },  // upper corner (near lane wall)
-    v1: { x: 0.796, y: 0.76 },  // lower-right (near lane wall) — raised to open bottom passage
-    v2: { x: 0.690, y: 0.7916 },  // lower-left (near flipper)
-    kickEdge: 2,                  // v2→v0 is the hypotenuse (playfield-facing)
-    openEdge: 1,                  // v1→v2 is the open bottom — ball rolls freely underneath
+    // Wall-side at x=0.781 leaves ~0.089 gap from PLUNGER_LANE_LEFT (0.870) for ball to pass behind.
+    // Raised 0.015 units and shifted 0.015 inward from walls for more passage room below and behind.
+    // Bottom corner (v1) raised so ball can roll underneath.
+    v0: { x: 0.781, y: 0.665 },  // upper corner (near lane wall)
+    v1: { x: 0.781, y: 0.745 },  // lower-right (near lane wall) — raised to open bottom passage
+    v2: { x: 0.690, y: 0.7766 }, // lower-left (near flipper)
+    kickEdge: 2,                   // v2→v0 is the hypotenuse (playfield-facing)
+    openEdge: 1,                   // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
 ] as const;
