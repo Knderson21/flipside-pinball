@@ -42,9 +42,9 @@ export const neonTheme: ThemePack = {
   name: 'Neon Arcade',
   palette: neonPalette,
   fonts: {
-    score: '"Courier New", monospace',
-    label: '"Courier New", monospace',
-    title: '"Courier New", monospace',
+    score: '"Orbitron", sans-serif',
+    label: '"Exo 2", sans-serif',
+    title: '"Orbitron", sans-serif',
   },
   strings: {
     title: 'Neon Arcade',
@@ -149,9 +149,9 @@ export const retroTheme: ThemePack = {
   name: 'Retro Terminal',
   palette: retroPalette,
   fonts: {
-    score: '"Courier New", monospace',
-    label: '"Courier New", monospace',
-    title: '"Courier New", monospace',
+    score: '"VT323", monospace',
+    label: '"Share Tech Mono", monospace',
+    title: '"VT323", monospace',
   },
   strings: {
     title: 'Retro Terminal',
@@ -269,9 +269,9 @@ export const sakuraTheme: ThemePack = {
   name: 'Sakura Dream',
   palette: sakuraPalette,
   fonts: {
-    score: '"Georgia", serif',
-    label: '"Georgia", serif',
-    title: '"Georgia", serif',
+    score: '"Lato", sans-serif',
+    label: '"Quicksand", sans-serif',
+    title: '"Playfair Display", serif',
   },
   strings: {
     title: 'SAKURA',
