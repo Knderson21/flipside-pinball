@@ -359,38 +359,102 @@ export class Renderer {
 
   // ─── Orbit ──────────────────────────────────────────────────────────────────
 
+  /**
+   * Draws a smooth centripetal Catmull-Rom spline through normalized points.
+   *
+   * Uses alpha = 0.5 (centripetal parameterization), which weights each
+   * segment's tangent magnitude by the square-root of its chord length.
+   * This prevents the overshoot/divet artifacts that uniform Catmull-Rom
+   * produces when consecutive points have very different spacing — exactly
+   * what happens at the orbit's top corners where the short angled segments
+   * meet the long flat top segment.
+   *
+   * Endpoint tangents are clamped (ghost point = endpoint) so the spline
+   * starts and ends without overshoot.
+   */
+  private drawSmoothPolyline(pts: ReadonlyArray<{ x: number; y: number }>): void {
+    const { ctx } = this;
+    const n = pts.length;
+    if (n < 2) return;
+
+    const at = (i: number) => pts[Math.max(0, Math.min(n - 1, i))]!;
+
+    // Centripetal knot distance: |P_b - P_a|^0.5
+    const knotDist = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      return Math.sqrt(Math.sqrt(dx * dx + dy * dy)); // (d²)^0.25 = d^0.5
+    };
+
+    ctx.beginPath();
+    ctx.moveTo(this.sx(at(0).x), this.sy(at(0).y));
+
+    if (n === 2) {
+      ctx.lineTo(this.sx(at(1).x), this.sy(at(1).y));
+      ctx.stroke();
+      return;
+    }
+
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = at(i - 1);
+      const p1 = at(i);
+      const p2 = at(i + 1);
+      const p3 = at(i + 2);
+
+      // Knot intervals in arc-length parameter space
+      const dt01 = knotDist(p0, p1) || 1e-4;  // guard against coincident ghost pts
+      const dt12 = knotDist(p1, p2) || 1e-4;
+      const dt23 = knotDist(p2, p3) || 1e-4;
+
+      // Centripetal tangents at p1 and p2, scaled to the current interval dt12
+      const m1x = dt12 * ((p1.x - p0.x) / dt01 - (p2.x - p0.x) / (dt01 + dt12) + (p2.x - p1.x) / dt12);
+      const m1y = dt12 * ((p1.y - p0.y) / dt01 - (p2.y - p0.y) / (dt01 + dt12) + (p2.y - p1.y) / dt12);
+      const m2x = dt12 * ((p2.x - p1.x) / dt12 - (p3.x - p1.x) / (dt12 + dt23) + (p3.x - p2.x) / dt23);
+      const m2y = dt12 * ((p2.y - p1.y) / dt12 - (p3.y - p1.y) / (dt12 + dt23) + (p3.y - p2.y) / dt23);
+
+      ctx.bezierCurveTo(
+        this.sx(p1.x + m1x / 3), this.sy(p1.y + m1y / 3),
+        this.sx(p2.x - m2x / 3), this.sy(p2.y - m2y / 3),
+        this.sx(p2.x),           this.sy(p2.y),
+      );
+    }
+    ctx.stroke();
+  }
+
+  /**
+   * Extracts an ordered polyline from a chain of connected wall segments.
+   * Each segment's end point is the next segment's start point.
+   */
+  private segsToPoints(segs: ReadonlyArray<{ x1: number; y1: number; x2: number; y2: number }>): Array<{ x: number; y: number }> {
+    if (segs.length === 0) return [];
+    const first = segs[0]!;
+    const pts: Array<{ x: number; y: number }> = [{ x: first.x1, y: first.y1 }];
+    for (const s of segs) pts.push({ x: s.x2, y: s.y2 });
+    return pts;
+  }
+
   private drawOrbit(rc: RenderContext, palette: ColorPalette): void {
     if (this.theme.drawOrbit) {
       this.theme.drawOrbit(rc, palette);
       return;
     }
     const { ctx } = this;
-
-    // Draw outer walls (solid)
     ctx.strokeStyle = palette.orbitRailColor;
     ctx.lineWidth = 2;
-    for (const seg of ORBIT_OUTER_WALLS) {
-      ctx.beginPath();
-      ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
-      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
-      ctx.stroke();
-    }
 
-    // Draw one-way outer walls (solid, same style as regular outer walls)
-    for (const seg of ORBIT_OUTER_WALLS_ONEWAY) {
-      ctx.beginPath();
-      ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
-      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
-      ctx.stroke();
-    }
+    // Outer wall: ORBIT_OUTER_WALLS + ORBIT_OUTER_WALLS_ONEWAY form one
+    // continuous chain — draw as a single smooth curve.
+    const outerPts = [
+      ...this.segsToPoints(ORBIT_OUTER_WALLS),
+      // ONEWAY picks up where OUTER_WALLS ends; drop the duplicated junction point
+      ...this.segsToPoints(ORBIT_OUTER_WALLS_ONEWAY).slice(1),
+    ];
+    this.drawSmoothPolyline(outerPts);
 
-    // Draw inner walls (solid)
-    for (const seg of ORBIT_INNER_WALLS) {
-      ctx.beginPath();
-      ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
-      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
-      ctx.stroke();
-    }
+    // Inner walls: two separate chains with a deliberate gap at the top.
+    const innerLeft  = ORBIT_INNER_WALLS.slice(0, 4);   // left chain (4 segs)
+    const innerRight = ORBIT_INNER_WALLS.slice(4);        // right chain (4 segs)
+    this.drawSmoothPolyline(this.segsToPoints(innerLeft));
+    this.drawSmoothPolyline(this.segsToPoints(innerRight));
 
     // Entry/exit indicators (small circles at lane openings)
     ctx.lineWidth = 1.5;

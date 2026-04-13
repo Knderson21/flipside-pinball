@@ -31,7 +31,7 @@ export const DROP_TARGET_BONUS = 1000;         // base bonus for clearing a bank
 export const TABLE = {
   LEFT_WALL: 0.05,
   RIGHT_WALL: 0.95,
-  TOP_WALL: 0.04,
+  TOP_WALL: 0.03,
   DRAIN_Y: 0.97,
 
   PLUNGER_X: 0.910,
@@ -57,11 +57,11 @@ export const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + 0.45;
 // ─── Default Bumper Layout ────────────────────────────────────────────────────
 
 export const DEFAULT_BUMPERS: ReadonlyArray<{ x: number; y: number; score: number }> = [
-  { x: 0.485, y: 0.19, score: 100 },
-  { x: 0.285, y: 0.28, score: 100 },
-  { x: 0.685, y: 0.28, score: 100 },
-  { x: 0.365, y: 0.37, score: 75 },
-  { x: 0.605, y: 0.37, score: 75 },
+  { x: 0.495, y: 0.19, score: 100 },
+  { x: 0.295, y: 0.28, score: 100 },
+  { x: 0.695, y: 0.28, score: 100 },
+  { x: 0.375, y: 0.37, score: 75 },
+  { x: 0.615, y: 0.37, score: 75 },
 ] as const;
 
 export const BUMPER_RADIUS = 0.045;
