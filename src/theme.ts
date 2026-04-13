@@ -25,6 +25,14 @@ const neonPalette: ColorPalette = {
   labelColor: '#8899cc',
   drainColor: 'rgba(180, 0, 0, 0.35)',
   guideColor: '#0d2040',
+  slingshotColor: '#22ccff',
+  slingshotLitColor: '#66eeff',
+  rolloverColor: '#4488aa',
+  rolloverLitColor: '#00ff99',
+  scoopColor: '#334466',
+  scoopLitColor: '#00ffcc',
+  lockIndicatorColor: '#00ff99',
+  orbitRailColor: '#1a5577',
   overlay: 'rgba(0, 0, 20, 0.78)',
   accent: '#00ffcc',
 };
@@ -34,22 +42,22 @@ export const neonTheme: ThemePack = {
   name: 'Neon Arcade',
   palette: neonPalette,
   fonts: {
-    score: '"Courier New", monospace',
-    label: '"Courier New", monospace',
-    title: '"Courier New", monospace',
+    score: '"Orbitron", sans-serif',
+    label: '"Exo 2", sans-serif',
+    title: '"Orbitron", sans-serif',
   },
   strings: {
-    title: 'PINBALL',
-    subtitle: 'PRESS SPACE OR ENTER',
+    title: 'Neon Arcade',
+    subtitle: 'GET THE HIGH SCORE!',
     pressStart: 'PRESS SPACE OR ENTER',
     gameOver: 'GAME OVER',
     playAgain: 'PRESS SPACE TO PLAY AGAIN',
     pull: 'PULL',
     controls: [
-      'Z / ← = LEFT FLIPPER',
-      '/ / → = RIGHT FLIPPER',
+      'Z or ← = LEFT FLIPPER',
+      '/ or → = RIGHT FLIPPER',
       'SPACE = PLUNGER',
-      'T = SWAP THEME',
+      'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
   },
   sounds: {
@@ -58,10 +66,44 @@ export const neonTheme: ThemePack = {
     launch:          { type: 'synth', freq: 240, durationMs: 200, wave: 'sawtooth', volume: 0.15, slide: 540 },
     drain:           { type: 'synth', freq: 380, durationMs: 350, wave: 'sawtooth', volume: 0.2,  slide: -320 },
     dropTarget:      { type: 'synth', freq: 880, durationMs: 60,  wave: 'square',   volume: 0.18 },
+    slingshot:       { type: 'synth', freq: 520, durationMs: 60,  wave: 'triangle', volume: 0.14 },
+    rollover:        { type: 'synth', freq: 1200, durationMs: 40, wave: 'sine',     volume: 0.10 },
+    lockBall:        { type: 'synth', freq: 330, durationMs: 300, wave: 'square',   volume: 0.18, slide: 220 },
+    orbitShot:       { type: 'synth', freq: 300, durationMs: 400, wave: 'sine',     volume: 0.16, slide: 500 },
     missionComplete: { type: 'synth', freq: 440, durationMs: 550, wave: 'square',   volume: 0.22, slide: 660 },
     gameOver:        { type: 'synth', freq: 220, durationMs: 700, wave: 'sawtooth', volume: 0.22, slide: -180 },
   },
-  // Neon uses the renderer defaults (no overrides) — pure palette swap.
+  // Synthwave grid backdrop.
+  drawBackdrop: (rc, palette) => {
+    const { ctx, tableX, tableY, tableW, tableH } = rc;
+    ctx.fillStyle = palette.tableFill;
+    ctx.fillRect(tableX, tableY, tableW, tableH);
+
+    const cols = 12;
+    const rows = 24;
+    const cellW = tableW / cols;
+    const cellH = tableH / rows;
+
+    ctx.strokeStyle = palette.wallColor;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.25;
+
+    for (let c = 0; c <= cols; c++) {
+      const x = tableX + c * cellW;
+      ctx.beginPath();
+      ctx.moveTo(x, tableY);
+      ctx.lineTo(x, tableY + tableH);
+      ctx.stroke();
+    }
+    for (let r = 0; r <= rows; r++) {
+      const y = tableY + r * cellH;
+      ctx.beginPath();
+      ctx.moveTo(tableX, y);
+      ctx.lineTo(tableX + tableW, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  },
 };
 
 // ─── Alternate theme: Retro Terminal (orange-on-black) ───────────────────────
@@ -90,6 +132,14 @@ const retroPalette: ColorPalette = {
   labelColor: '#cc8844',
   drainColor: 'rgba(255, 68, 0, 0.28)',
   guideColor: '#1a0a00',
+  slingshotColor: '#ff4400',
+  slingshotLitColor: '#ffaa00',
+  rolloverColor: '#884422',
+  rolloverLitColor: '#ffaa00',
+  scoopColor: '#442200',
+  scoopLitColor: '#ffee44',
+  lockIndicatorColor: '#ffaa00',
+  orbitRailColor: '#663300',
   overlay: 'rgba(20, 10, 0, 0.82)',
   accent: '#ffee44',
 };
@@ -99,22 +149,22 @@ export const retroTheme: ThemePack = {
   name: 'Retro Terminal',
   palette: retroPalette,
   fonts: {
-    score: '"Courier New", monospace',
-    label: '"Courier New", monospace',
-    title: '"Courier New", monospace',
+    score: '"VT323", monospace',
+    label: '"Share Tech Mono", monospace',
+    title: '"VT323", monospace',
   },
   strings: {
-    title: 'SPACE CADET',
+    title: 'Retro Terminal',
     subtitle: '>>> INSERT COIN <<<',
     pressStart: 'PRESS SPACE TO BEGIN MISSION',
     gameOver: 'MISSION FAILED',
     playAgain: 'PRESS SPACE TO RETRY',
     pull: 'LAUNCH',
     controls: [
-      'Z / ← = PORT THRUSTER',
-      '/ / → = STARBOARD THRUSTER',
+      'Z or ← = PORT THRUSTER',
+      '/ or → = STARBOARD THRUSTER',
       'SPACE = LAUNCH',
-      'T = SWAP THEME',
+      'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
   },
   sounds: {
@@ -123,6 +173,10 @@ export const retroTheme: ThemePack = {
     launch:          { type: 'synth', freq: 120,  durationMs: 280, wave: 'sawtooth', volume: 0.18, slide: 680 },
     drain:           { type: 'synth', freq: 420,  durationMs: 400, wave: 'sawtooth', volume: 0.22, slide: -400 },
     dropTarget:      { type: 'synth', freq: 1200, durationMs: 55,  wave: 'triangle', volume: 0.16 },
+    slingshot:       { type: 'synth', freq: 700,  durationMs: 50,  wave: 'square',   volume: 0.14 },
+    rollover:        { type: 'synth', freq: 1500, durationMs: 35,  wave: 'sine',     volume: 0.10 },
+    lockBall:        { type: 'synth', freq: 280,  durationMs: 350, wave: 'square',   volume: 0.20, slide: 180 },
+    orbitShot:       { type: 'synth', freq: 250,  durationMs: 450, wave: 'sine',     volume: 0.18, slide: 400 },
     missionComplete: { type: 'synth', freq: 520,  durationMs: 650, wave: 'square',   volume: 0.24, slide: 880 },
     gameOver:        { type: 'synth', freq: 180,  durationMs: 900, wave: 'sawtooth', volume: 0.24, slide: -140 },
   },
@@ -132,14 +186,17 @@ export const retroTheme: ThemePack = {
     ctx.fillStyle = palette.tableFill;
     ctx.fillRect(tableX, tableY, tableW, tableH);
 
-    // Deterministic pseudo-random stars (seeded by position — no RNG state).
+    // Deterministic pseudo-random stars using a hash to avoid diagonal banding.
     ctx.fillStyle = palette.labelColor;
     const starCount = 80;
     for (let i = 0; i < starCount; i++) {
-      const sx = ((i * 9301 + 49297) % 233280) / 233280;
-      const sy = ((i * 4903 + 17321) % 233280) / 233280;
-      const r = 0.5 + ((i * 131) % 3) * 0.4;
-      ctx.globalAlpha = 0.3 + ((i * 37) % 5) * 0.1;
+      // Simple integer hash (xorshift-style) to break linear patterns.
+      let hx = i * 374761393 + 1013904223; hx = ((hx >>> 16) ^ hx) * 1274126177; hx = (hx >>> 16) ^ hx;
+      let hy = i * 668265263 + 2654435761; hy = ((hy >>> 16) ^ hy) * 2246822519; hy = (hy >>> 16) ^ hy;
+      const sx = (hx >>> 0) / 4294967296;
+      const sy = (hy >>> 0) / 4294967296;
+      const r = 0.5 + (((hx >>> 8) & 3) * 0.4);
+      ctx.globalAlpha = 0.3 + ((hy >>> 12) % 5) * 0.1;
       ctx.fillRect(tableX + sx * tableW, tableY + sy * tableH, r, r);
     }
     ctx.globalAlpha = 1;
@@ -170,8 +227,184 @@ export const retroTheme: ThemePack = {
   },
 };
 
+// ─── Alternate theme: Sakura Dream (pink/pastel) ────────────────────────────
+
+const sakuraPalette: ColorPalette = {
+  background: '#fff0f5',
+  tableFill: '#fce4ec',
+  tableBorder: '#f48fb1',
+  ballColor: '#ffffff',
+  ballHighlight: '#fff9c4',
+  flipperColor: '#e91e90',
+  flipperActiveColor: '#ff69b4',
+  bumperIdleColor: '#fce4ec',
+  bumperLitColor: '#ff80ab',
+  bumperBorderColor: '#f48fb1',
+  bumperLitBorderColor: '#ff4081',
+  dropTargetColor: '#f06292',
+  dropTargetDownColor: '#f8bbd0',
+  wallColor: '#f48fb1',
+  plungerTrackColor: '#fce4ec',
+  plungerColor: '#e91e90',
+  plungerChargedColor: '#ff4081',
+  scoreColor: '#ad1457',
+  hudBackground: 'rgba(252, 228, 236, 0.80)',
+  labelColor: '#c2185b',
+  drainColor: 'rgba(233, 30, 99, 0.20)',
+  guideColor: '#f8bbd0',
+  slingshotColor: '#f06292',
+  slingshotLitColor: '#ff80ab',
+  rolloverColor: '#f48fb1',
+  rolloverLitColor: '#ff4081',
+  scoopColor: '#f8bbd0',
+  scoopLitColor: '#ff80ab',
+  lockIndicatorColor: '#ff4081',
+  orbitRailColor: '#f48fb1',
+  overlay: 'rgba(252, 228, 236, 0.85)',
+  accent: '#e91e63',
+};
+
+export const sakuraTheme: ThemePack = {
+  id: 'sakura',
+  name: 'Sakura Dream',
+  palette: sakuraPalette,
+  fonts: {
+    score: '"Lato", sans-serif',
+    label: '"Quicksand", sans-serif',
+    title: '"Playfair Display", serif',
+  },
+  strings: {
+    title: 'SAKURA',
+    subtitle: '~ a dreamy pinball ~',
+    pressStart: 'TAP OR PRESS SPACE',
+    gameOver: 'SWEET DREAMS...',
+    playAgain: 'PRESS SPACE TO PLAY AGAIN',
+    pull: 'PULL',
+    controls: [
+      'Z or \u2190 = LEFT FLIPPER',
+      '/ or \u2192 = RIGHT FLIPPER',
+      'SPACE = PLUNGER',
+      'F = SWAP THEME (TAP TOP ON MOBILE)',
+    ],
+  },
+  sounds: {
+    bumper:          { type: 'synth', freq: 880,  durationMs: 120, wave: 'sine',     volume: 0.08, slide: 440 },
+    flipper:         { type: 'synth', freq: 330,  durationMs: 60,  wave: 'sine',     volume: 0.07 },
+    launch:          { type: 'synth', freq: 440,  durationMs: 300, wave: 'sine',     volume: 0.10, slide: 880 },
+    drain:           { type: 'synth', freq: 660,  durationMs: 500, wave: 'sine',     volume: 0.10, slide: -330 },
+    dropTarget:      { type: 'synth', freq: 1047, durationMs: 100, wave: 'sine',     volume: 0.09, slide: 523 },
+    slingshot:       { type: 'synth', freq: 784,  durationMs: 80,  wave: 'sine',     volume: 0.08, slide: 392 },
+    rollover:        { type: 'synth', freq: 1319, durationMs: 80,  wave: 'sine',     volume: 0.06, slide: 660 },
+    lockBall:        { type: 'synth', freq: 523,  durationMs: 400, wave: 'sine',     volume: 0.10, slide: 262 },
+    orbitShot:       { type: 'synth', freq: 660,  durationMs: 500, wave: 'sine',     volume: 0.09, slide: 1320 },
+    missionComplete: { type: 'synth', freq: 523,  durationMs: 700, wave: 'sine',     volume: 0.12, slide: 1047 },
+    gameOver:        { type: 'synth', freq: 440,  durationMs: 900, wave: 'sine',     volume: 0.12, slide: -220 },
+  },
+  drawBackdrop: (rc, palette) => {
+    const { ctx, tableX, tableY, tableW, tableH } = rc;
+    ctx.fillStyle = palette.tableFill;
+    ctx.fillRect(tableX, tableY, tableW, tableH);
+
+    // Deterministic sparkles using a hash to avoid diagonal banding.
+    ctx.fillStyle = '#ffffff';
+    const sparkleCount = 50;
+    for (let i = 0; i < sparkleCount; i++) {
+      let hx = (i + 200) * 374761393 + 1013904223; hx = ((hx >>> 16) ^ hx) * 1274126177; hx = (hx >>> 16) ^ hx;
+      let hy = (i + 200) * 668265263 + 2654435761; hy = ((hy >>> 16) ^ hy) * 2246822519; hy = (hy >>> 16) ^ hy;
+      const sx = (hx >>> 0) / 4294967296;
+      const sy = (hy >>> 0) / 4294967296;
+      const size = 1 + ((hx >>> 8) & 3);
+      ctx.globalAlpha = 0.25 + ((hy >>> 12) % 4) * 0.1;
+      // Draw a 4-point star sparkle
+      const px = tableX + sx * tableW;
+      const py = tableY + sy * tableH;
+      ctx.beginPath();
+      ctx.moveTo(px, py - size);
+      ctx.lineTo(px + size * 0.3, py);
+      ctx.lineTo(px, py + size);
+      ctx.lineTo(px - size * 0.3, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(px - size, py);
+      ctx.lineTo(px, py + size * 0.3);
+      ctx.lineTo(px + size, py);
+      ctx.lineTo(px, py - size * 0.3);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Deterministic sakura flower outlines scattered across the table.
+    // Two layers: pink flowers and smaller white flowers for depth.
+    const flowers: Array<{ count: number; seed: number; color: string; alpha: number; sizeBase: number; sizeRange: number }> = [
+      { count: 16, seed: 500, color: '#f48fb1', alpha: 0.2,  sizeBase: 6, sizeRange: 5 },
+      { count: 10, seed: 800, color: '#ffffff', alpha: 0.18, sizeBase: 4, sizeRange: 4 },
+    ];
+    for (const layer of flowers) {
+      ctx.strokeStyle = layer.color;
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = layer.alpha;
+      for (let i = 0; i < layer.count; i++) {
+        let hx = (i + layer.seed) * 374761393 + 1013904223; hx = ((hx >>> 16) ^ hx) * 1274126177; hx = (hx >>> 16) ^ hx;
+        let hy = (i + layer.seed) * 668265263 + 2654435761; hy = ((hy >>> 16) ^ hy) * 2246822519; hy = (hy >>> 16) ^ hy;
+        const fx = (hx >>> 0) / 4294967296;
+        const fy = (hy >>> 0) / 4294967296;
+        const fr = layer.sizeBase + ((hx >>> 8) % layer.sizeRange) * 2;
+        const cx = tableX + fx * tableW;
+        const cy = tableY + fy * tableH;
+        // Draw 5 petals as overlapping ellipses
+        for (let p = 0; p < 5; p++) {
+          const angle = (p * Math.PI * 2) / 5 - Math.PI / 2;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.ellipse(0, -fr * 0.6, fr * 0.38, fr * 0.6, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+        // Small circle center
+        ctx.beginPath();
+        ctx.arc(cx, cy, fr * 0.18, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  },
+  drawBumper: (rc, bumper, palette) => {
+    const { ctx, sx, sy, sl } = rc;
+    const cx = sx(bumper.position.x);
+    const cy = sy(bumper.position.y);
+    const r = sl(bumper.radius);
+    const lit = bumper.lit;
+
+    // Soft filled circle with a flower-like border
+    ctx.fillStyle = lit ? palette.bumperLitColor : palette.bumperIdleColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Petal scallops around the edge
+    ctx.strokeStyle = lit ? palette.bumperLitBorderColor : palette.bumperBorderColor;
+    ctx.lineWidth = lit ? 2.5 : 1.5;
+    const petalCount = 6;
+    for (let p = 0; p < petalCount; p++) {
+      const angle = (p * Math.PI * 2) / petalCount;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(angle) * r * 0.55, cy + Math.sin(angle) * r * 0.55, r * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = lit ? palette.bumperLitBorderColor : palette.labelColor;
+    const fontSize = Math.max(9, Math.round(sl(0.032)));
+    ctx.font = `700 ${fontSize}px "Georgia", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(bumper.scoreValue), cx, cy);
+    ctx.textBaseline = 'alphabetic';
+  },
+};
+
 // ─── Theme registry ───────────────────────────────────────────────────────────
 
-export const themes: ThemePack[] = [neonTheme, retroTheme];
-
-export const defaultTheme = neonTheme;
+export const themes: ThemePack[] = [neonTheme, retroTheme, sakuraTheme];

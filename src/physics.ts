@@ -1,4 +1,4 @@
-import type { Ball, Bumper, DropTarget, Flipper, Plunger, Vec2 } from './types';
+import type { Ball, Bumper, DropTarget, Flipper, Plunger, Slingshot, Vec2 } from './types';
 import {
   BALL_MAX_SPEED,
   BUMPER_RESTITUTION,
@@ -12,6 +12,7 @@ import {
   MAX_PLUNGER_VELOCITY,
   RIGHT_FLIPPER_ACTIVE_ANGLE,
   RIGHT_FLIPPER_REST_ANGLE,
+  SLINGSHOT_RESTITUTION,
   TABLE,
   WALL_RESTITUTION,
 } from './constants';
@@ -59,10 +60,12 @@ export function collideBallWalls(ball: Ball): void {
   if (ball.position.y - r < TABLE.TOP_WALL) {
     ball.position.y = TABLE.TOP_WALL + r;
     if (ball.position.x > TABLE.PLUNGER_LANE_LEFT) {
-      // Curved top rail: route lane-launched ball back into the play field.
+      // Curved launch lane: redirect ball leftward with a natural exit angle.
+      // The launch lane curve segments in constants.ts provide additional
+      // guidance as the ball travels across the upper playfield.
       const speed = length(ball.velocity);
-      ball.velocity.x = -speed * WALL_RESTITUTION;
-      ball.velocity.y = speed * 0.15;
+      ball.velocity.x = -speed * 0.75;
+      ball.velocity.y = speed * 0.45;
     } else {
       ball.velocity.y = Math.abs(ball.velocity.y) * WALL_RESTITUTION;
     }
@@ -81,7 +84,7 @@ export function collideBallWalls(ball: Ball): void {
   // Plunger lane left wall — one-way exit only.
   // A ball seated in the lane (inPlunger) is kept inside; any other ball is
   // immediately pushed back into the playfield so it can never re-enter the lane.
-  const LANE_EXIT_Y = 0.14;
+  const LANE_EXIT_Y = 0.5;
   if (ball.position.y > LANE_EXIT_Y) {
     if (ball.inPlunger) {
       // Keep the lane ball inside the lane.
@@ -294,6 +297,139 @@ export function collideBallSegment(
   }
 
   return true;
+}
+
+// ─── One-Sided Wall Segment Collision ────────────────────────────────────────
+// Only collides when the ball is on the "inner" side of the segment (left side
+// of the segment direction vector) AND moving downward. Balls moving upward
+// (still launching / traveling up the lane) always pass through regardless of
+// side. Used for the orbit lane's bottom-right outer wall so balls from the
+// launch lane can enter the orbit but cannot exit back into the launch lane.
+
+export function collideBallSegmentOneSided(
+  ball: Ball,
+  x1: number, y1: number,
+  x2: number, y2: number,
+): boolean {
+  // Balls still moving upward are not blocked — they haven't finished
+  // launching / traveling through the lane yet.
+  if (ball.velocity.y < 0) return false;
+
+  // Cross product of segment direction × (ball - segment start).
+  // Positive = ball is on the left (inner) side → apply collision.
+  // Negative = ball is on the right (outer) side → pass through.
+  const segX = x2 - x1;
+  const segY = y2 - y1;
+  const toBallX = ball.position.x - x1;
+  const toBallY = ball.position.y - y1;
+  const cross = segX * toBallY - segY * toBallX;
+  if (cross < 0) return false;
+  return collideBallSegment(ball, x1, y1, x2, y2);
+}
+
+// ─── Orbit Zone Detection ────────────────────────────────────────────────────
+
+/** Check if a ball is within an orbit entry/exit zone and moving upward fast enough. */
+export function checkOrbitZone(
+  ball: Ball,
+  zoneX: number, zoneY: number, zoneRadius: number,
+  minSpeed: number,
+): boolean {
+  const dx = ball.position.x - zoneX;
+  const dy = ball.position.y - zoneY;
+  if (dx * dx + dy * dy >= zoneRadius * zoneRadius) return false;
+  if (ball.velocity.y >= 0) return false;
+  const spd = length(ball.velocity);
+  return spd >= minSpeed;
+}
+
+// ─── Scoop Detection ─────────────────────────────────────────────────────────
+
+export function isBallInScoop(
+  ball: Ball,
+  scoopX: number, scoopY: number, scoopRadius: number,
+): boolean {
+  const dx = ball.position.x - scoopX;
+  const dy = ball.position.y - scoopY;
+  return dx * dx + dy * dy < scoopRadius * scoopRadius;
+}
+
+// ─── Rollover Detection ──────────────────────────────────────────────────────
+// Pure detection — does NOT modify ball velocity or position.
+
+export function checkRollover(
+  ball: Ball,
+  rolloverX: number, rolloverY: number, rolloverRadius: number,
+): boolean {
+  const dx = ball.position.x - rolloverX;
+  const dy = ball.position.y - rolloverY;
+  return dx * dx + dy * dy < (ball.radius + rolloverRadius) * (ball.radius + rolloverRadius);
+}
+
+// ─── Slingshot Collision ──────────────────────────────────────────────────────
+
+/**
+ * Tests ball against each edge of a triangular slingshot. The kick edge uses
+ * SLINGSHOT_RESTITUTION (> 1, adds energy); other edges use WALL_RESTITUTION.
+ * Returns true if any edge was hit.
+ */
+export function collideBallSlingshot(ball: Ball, slingshot: Slingshot): boolean {
+  const verts = slingshot.vertices;
+  let hit = false;
+
+  for (let i = 0; i < 3; i++) {
+    if (i === slingshot.openEdgeIndex) continue;
+    const v1 = verts[i]!;
+    const v2 = verts[(i + 1) % 3]!;
+
+    const segX = v2.x - v1.x;
+    const segY = v2.y - v1.y;
+    const segLenSq = segX * segX + segY * segY;
+
+    const toBallX = ball.position.x - v1.x;
+    const toBallY = ball.position.y - v1.y;
+    const t = clamp(
+      segLenSq > 0 ? (toBallX * segX + toBallY * segY) / segLenSq : 0,
+      0, 1,
+    );
+
+    const closestX = v1.x + t * segX;
+    const closestY = v1.y + t * segY;
+
+    const dx = ball.position.x - closestX;
+    const dy = ball.position.y - closestY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist >= ball.radius || dist === 0) continue;
+
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    ball.position.x += nx * (ball.radius - dist);
+    ball.position.y += ny * (ball.radius - dist);
+
+    const vDotN = ball.velocity.x * nx + ball.velocity.y * ny;
+    if (vDotN < 0) {
+      const restitution = i === slingshot.kickEdgeIndex
+        ? SLINGSHOT_RESTITUTION
+        : WALL_RESTITUTION;
+      ball.velocity.x -= (1 + restitution) * vDotN * nx;
+      ball.velocity.y -= (1 + restitution) * vDotN * ny;
+    }
+
+    // Cap speed after energy-adding kick
+    if (i === slingshot.kickEdgeIndex) {
+      const spd = length(ball.velocity);
+      if (spd > BALL_MAX_SPEED) {
+        ball.velocity.x = (ball.velocity.x / spd) * BALL_MAX_SPEED;
+        ball.velocity.y = (ball.velocity.y / spd) * BALL_MAX_SPEED;
+      }
+    }
+
+    hit = true;
+  }
+
+  return hit;
 }
 
 // ─── Plunger ──────────────────────────────────────────────────────────────────

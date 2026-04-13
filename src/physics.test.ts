@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import type { Ball, Bumper, DropTarget, Flipper, Plunger } from './types';
+import type { Ball, Bumper, DropTarget, Flipper, Plunger, Slingshot } from './types';
 import {
+  checkOrbitZone,
+  checkRollover,
   collideBallBumper,
   collideBallDropTarget,
   collideBallFlipper,
   collideBallSegment,
+  collideBallSegmentOneSided,
+  collideBallSlingshot,
   collideBallWalls,
   isBallDrained,
+  isBallInScoop,
   launchBall,
   makeLeftFlipper,
   makeRightFlipper,
@@ -21,6 +26,7 @@ import {
   BUMPER_RADIUS,
   GRAVITY,
   MAX_PLUNGER_VELOCITY,
+  ROLLOVER_RADIUS,
   TABLE,
 } from './constants';
 
@@ -250,6 +256,56 @@ describe('collideBallSegment', () => {
   });
 });
 
+// ─── collideBallSegmentOneSided ──────────────────────────────────────────────
+
+describe('collideBallSegmentOneSided', () => {
+  // Segment goes from top-right to bottom-left (like orbit bottom-right outer wall).
+  // Inner side (left of direction) = orbit interior = positive cross product.
+  const seg = { x1: 0.950, y1: 0.220, x2: 0.900, y2: 0.460 };
+
+  it('collides when ball is on the inner side and moving downward', () => {
+    // Ball inside the orbit lane, falling back down
+    const ball = makeBall({
+      position: { x: 0.910, y: 0.340 },
+      velocity: { x: 0.001, y: 0.001 },
+    });
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(true);
+  });
+
+  it('passes through when ball is moving upward even on inner side', () => {
+    // Ball inside the orbit lane but still traveling upward — don't block
+    const ball = makeBall({
+      position: { x: 0.910, y: 0.340 },
+      velocity: { x: 0.001, y: -0.002 },
+    });
+    const origX = ball.position.x;
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(false);
+    expect(ball.position.x).toBe(origX);
+  });
+
+  it('passes through when ball is on the outer (right) side of the segment', () => {
+    // Ball to the right of the segment — in the launch lane area
+    const ball = makeBall({
+      position: { x: 0.945, y: 0.340 },
+      velocity: { x: -0.001, y: 0.001 },
+    });
+    const origX = ball.position.x;
+    const origVx = ball.velocity.x;
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(false);
+    expect(ball.position.x).toBe(origX);
+    expect(ball.velocity.x).toBe(origVx);
+  });
+
+  it('returns false when ball is far from the segment', () => {
+    const ball = makeBall({ position: { x: 0.1, y: 0.1 } });
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(false);
+  });
+});
+
 // ─── updateFlipper ──────────────────────────────────────────────────────────
 
 describe('updateFlipper', () => {
@@ -326,7 +382,7 @@ describe('isBallDrained', () => {
 describe('plunger lane — one-way wall', () => {
   it('rejects a playfield ball drifting rightward into the lane', () => {
     const ball = makeBall({
-      position: { x: TABLE.PLUNGER_LANE_LEFT + 0.005, y: 0.5 },
+      position: { x: TABLE.PLUNGER_LANE_LEFT + 0.005, y: 0.6 },
       velocity: { x: 0.001, y: 0 },
       inPlunger: false,
     });
@@ -363,7 +419,7 @@ describe('plunger lane — one-way wall', () => {
 
   it('keeps an inPlunger ball inside the lane if it drifts left', () => {
     const ball = makeBall({
-      position: { x: TABLE.PLUNGER_LANE_LEFT - 0.005, y: 0.5 },
+      position: { x: TABLE.PLUNGER_LANE_LEFT - 0.005, y: 0.6 },
       velocity: { x: -0.001, y: 0 },
       inPlunger: true,
     });
@@ -372,8 +428,8 @@ describe('plunger lane — one-way wall', () => {
     expect(ball.velocity.x).toBeGreaterThan(0);
   });
 
-  it('one-way wall is inactive above the lane exit threshold (y < 0.14)', () => {
-    // Above y = 0.14 the wall does not exist so the ball can arc into the playfield.
+  it('one-way wall is inactive above the lane exit threshold (y < 0.5)', () => {
+    // Above y = 0.5 the wall does not exist so the ball can arc into the playfield.
     const ball = makeBall({
       position: { x: TABLE.BALL_SPAWN_X, y: 0.10 },
       velocity: { x: 0.001, y: -0.003 },
@@ -489,5 +545,173 @@ describe('plunger lane — launch sequence', () => {
       if (ball.position.y < 0.14) { exitedLane = true; break; }
     }
     expect(exitedLane).toBe(true);
+  });
+});
+
+// ─── checkRollover ──────────────────────────────────────────────────────────
+
+describe('checkRollover', () => {
+  it('returns true when ball is directly over the rollover', () => {
+    const ball = makeBall({ position: { x: 0.25, y: 0.12 } });
+    expect(checkRollover(ball, 0.25, 0.12, ROLLOVER_RADIUS)).toBe(true);
+  });
+
+  it('returns true when ball is within combined radii', () => {
+    const ball = makeBall({ position: { x: 0.25 + BALL_RADIUS + ROLLOVER_RADIUS - 0.005, y: 0.12 } });
+    expect(checkRollover(ball, 0.25, 0.12, ROLLOVER_RADIUS)).toBe(true);
+  });
+
+  it('returns false when ball is far away', () => {
+    const ball = makeBall({ position: { x: 0.80, y: 0.80 } });
+    expect(checkRollover(ball, 0.25, 0.12, ROLLOVER_RADIUS)).toBe(false);
+  });
+
+  it('does not modify ball velocity', () => {
+    const ball = makeBall({ position: { x: 0.25, y: 0.12 }, velocity: { x: 0.001, y: -0.002 } });
+    const vxBefore = ball.velocity.x;
+    const vyBefore = ball.velocity.y;
+    checkRollover(ball, 0.25, 0.12, ROLLOVER_RADIUS);
+    expect(ball.velocity.x).toBe(vxBefore);
+    expect(ball.velocity.y).toBe(vyBefore);
+  });
+
+  it('does not modify ball position', () => {
+    const ball = makeBall({ position: { x: 0.25, y: 0.12 } });
+    const xBefore = ball.position.x;
+    const yBefore = ball.position.y;
+    checkRollover(ball, 0.25, 0.12, ROLLOVER_RADIUS);
+    expect(ball.position.x).toBe(xBefore);
+    expect(ball.position.y).toBe(yBefore);
+  });
+});
+
+// ─── isBallInScoop ──────────────────────────────────────────────────────────
+
+describe('isBallInScoop', () => {
+  it('returns true when ball center is inside scoop radius', () => {
+    const ball = makeBall({ position: { x: 0.50, y: 0.48 } });
+    expect(isBallInScoop(ball, 0.50, 0.48, 0.035)).toBe(true);
+  });
+
+  it('returns true when ball center is near scoop edge', () => {
+    const ball = makeBall({ position: { x: 0.50 + 0.02, y: 0.48 } });
+    expect(isBallInScoop(ball, 0.50, 0.48, 0.035)).toBe(true);
+  });
+
+  it('returns false when ball is outside scoop', () => {
+    const ball = makeBall({ position: { x: 0.50 + 0.05, y: 0.48 } });
+    expect(isBallInScoop(ball, 0.50, 0.48, 0.035)).toBe(false);
+  });
+
+  it('returns false when ball is far away', () => {
+    const ball = makeBall({ position: { x: 0.10, y: 0.10 } });
+    expect(isBallInScoop(ball, 0.50, 0.48, 0.035)).toBe(false);
+  });
+});
+
+// ─── collideBallSlingshot ───────────────────────────────────────────────────
+
+function makeSlingshot(overrides: Partial<Slingshot> = {}): Slingshot {
+  return {
+    id: 'sling-0',
+    vertices: [
+      { x: 0.10, y: 0.70 },
+      { x: 0.24, y: 0.83 },
+      { x: 0.10, y: 0.83 },
+    ],
+    kickEdgeIndex: 0,
+    openEdgeIndex: 1,
+    scoreValue: 50,
+    lit: false,
+    litTimer: 0,
+    ...overrides,
+  };
+}
+
+describe('collideBallSlingshot', () => {
+  it('returns false when ball is far from slingshot', () => {
+    const ball = makeBall({ position: { x: 0.80, y: 0.20 } });
+    const sling = makeSlingshot();
+    expect(collideBallSlingshot(ball, sling)).toBe(false);
+  });
+
+  it('returns true when ball touches an edge', () => {
+    // Place ball near the kick edge (v0→v1)
+    // Midpoint of kick edge: (0.17, 0.765)
+    const ball = makeBall({
+      position: { x: 0.19, y: 0.76 },
+      velocity: { x: -0.001, y: 0.001 },
+    });
+    const sling = makeSlingshot();
+    expect(collideBallSlingshot(ball, sling)).toBe(true);
+  });
+
+  it('applies boosted restitution on kick edge', () => {
+    // Ball moving into the kick edge should bounce with more energy
+    const ball = makeBall({
+      position: { x: 0.19, y: 0.76 },
+      velocity: { x: -0.001, y: 0.001 },
+    });
+    const speedBefore = Math.hypot(ball.velocity.x, ball.velocity.y);
+    const sling = makeSlingshot();
+    collideBallSlingshot(ball, sling);
+    const speedAfter = Math.hypot(ball.velocity.x, ball.velocity.y);
+    // Kick edge has restitution > 1, so speed should increase
+    expect(speedAfter).toBeGreaterThan(speedBefore * 0.9);
+  });
+
+  it('caps speed at BALL_MAX_SPEED after kick', () => {
+    const ball = makeBall({
+      position: { x: 0.19, y: 0.76 },
+      velocity: { x: -BALL_MAX_SPEED, y: 0 },
+    });
+    const sling = makeSlingshot();
+    collideBallSlingshot(ball, sling);
+    const speed = Math.hypot(ball.velocity.x, ball.velocity.y);
+    expect(speed).toBeLessThanOrEqual(BALL_MAX_SPEED + 1e-9);
+  });
+});
+
+// ─── checkOrbitZone ─────────────────────────────────────────────────────────
+
+describe('checkOrbitZone', () => {
+  it('returns true when ball is in zone with upward velocity', () => {
+    const ball = makeBall({
+      position: { x: 0.12, y: 0.30 },
+      velocity: { x: 0, y: -0.002 },
+    });
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(true);
+  });
+
+  it('returns false when ball is moving downward', () => {
+    const ball = makeBall({
+      position: { x: 0.12, y: 0.30 },
+      velocity: { x: 0, y: 0.002 },
+    });
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
+  });
+
+  it('returns false when ball is outside zone', () => {
+    const ball = makeBall({
+      position: { x: 0.50, y: 0.50 },
+      velocity: { x: 0, y: -0.002 },
+    });
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
+  });
+
+  it('returns false when ball speed is below minimum', () => {
+    const ball = makeBall({
+      position: { x: 0.12, y: 0.30 },
+      velocity: { x: 0, y: -0.0005 },
+    });
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(false);
+  });
+
+  it('returns true when ball is at edge of zone with sufficient speed', () => {
+    const ball = makeBall({
+      position: { x: 0.12 + 0.03, y: 0.30 },
+      velocity: { x: -0.001, y: -0.001 },
+    });
+    expect(checkOrbitZone(ball, 0.12, 0.30, 0.04, 0.001)).toBe(true);
   });
 });

@@ -1,14 +1,29 @@
 import type {
   Ball,
+  BallLockState,
   Bumper,
   ColorPalette,
   DropTarget,
   Flipper,
   GameState,
   RenderContext,
+  RolloverLane,
+  Slingshot,
   ThemePack,
 } from './types';
-import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, TABLE, TABLE_ASPECT } from './constants';
+import {
+  BALLS_PER_GAME,
+  FLIPPER_THICKNESS,
+  GUIDE_WALLS,
+  LOCK_SCOOP,
+  ORBIT_INNER_WALLS,
+  ORBIT_LEFT,
+  ORBIT_OUTER_WALLS,
+  ORBIT_OUTER_WALLS_ONEWAY,
+  ORBIT_RIGHT,
+  TABLE,
+  TABLE_ASPECT
+} from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
@@ -35,10 +50,6 @@ export class Renderer {
 
   setTheme(theme: ThemePack): void {
     this.theme = theme;
-  }
-
-  getTheme(): ThemePack {
-    return this.theme;
   }
 
   // ─── Resize / Scaling ───────────────────────────────────────────────────────
@@ -119,13 +130,18 @@ export class Renderer {
     // Backdrop (theme may override)
     if (this.theme.drawBackdrop) {
       this.theme.drawBackdrop(rc, palette);
-      this.drawTableChrome(palette);
     } else {
       this.drawTable(palette);
     }
 
     this.drawPlungerLane(state, palette);
+    // Chrome (wall strokes) drawn after all fills so nothing covers them
+    this.drawTableChrome(palette);
+    this.drawOrbit(rc, palette);
+    this.drawScoop(state.mission.lock, rc, palette);
     this.drawDropTargets(state.dropTargets, rc, palette);
+    this.drawRollovers(state.rollovers, rc, palette);
+    this.drawSlingshots(state.slingshots, rc, palette);
     this.drawBumpers(state.bumpers, rc, palette);
     this.drawFlippers(state.flippers, rc, palette);
     for (const ball of state.balls) {
@@ -155,8 +171,6 @@ export class Renderer {
     ctx.fillStyle = palette.guideColor;
     ctx.fillRect(x, y, this.sl(TABLE.LEFT_WALL), h);
     ctx.fillRect(this.sx(TABLE.RIGHT_WALL), y, this.sl(1 - TABLE.RIGHT_WALL), h);
-
-    this.drawTableChrome(palette);
   }
 
   /** Borders and playfield walls — drawn on top of any custom backdrop. */
@@ -202,7 +216,7 @@ export class Renderer {
   private drawPlungerLane(state: GameState, palette: ColorPalette): void {
     const { ctx } = this;
 
-    ctx.fillStyle = palette.plungerTrackColor;
+    ctx.fillStyle = palette.tableFill;
     ctx.fillRect(
       this.sx(TABLE.PLUNGER_LANE_LEFT),
       this.sy(TABLE.TOP_WALL),
@@ -213,7 +227,8 @@ export class Renderer {
     ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(TABLE.TOP_WALL));
+    // Lane left wall stops at y=0.5
+    ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(0.5));
     ctx.lineTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(TABLE.DRAIN_Y));
     ctx.stroke();
 
@@ -230,7 +245,7 @@ export class Renderer {
     const laneRight = this.sx(TABLE.RIGHT_WALL);
     const laneWidth = laneRight - laneLeft;
     const laneBottom = this.sy(TABLE.DRAIN_Y);
-    const plungerHeight = this.sl(0.12);
+    const plungerHeight = this.sl(0.14);
 
     const tickCount = 5;
     const tickAreaH = this.sl(0.18);
@@ -244,8 +259,14 @@ export class Renderer {
       ctx.stroke();
     }
 
+    // Cradle bar — the horizontal stop the ball visually rests on
+    const cradleY = this.sy(TABLE.LANE_FLOOR_Y - 0.015);
+    const cradleH = Math.max(4, this.sl(0.008));
+    ctx.fillStyle = palette.plungerColor;
+    ctx.fillRect(laneLeft, cradleY, laneWidth, cradleH);
+
     const compressionOffset = charge * this.sl(0.06);
-    const rodY = laneBottom - compressionOffset;
+    const rodY = laneBottom + compressionOffset;
     const rodH = plungerHeight * (1 - charge * 0.4);
 
     ctx.fillStyle = charge > 0.1 ? palette.plungerChargedColor : palette.plungerColor;
@@ -265,7 +286,9 @@ export class Renderer {
       const fontSize = Math.round(this.sl(0.035));
       ctx.font = `600 ${fontSize}px ${this.theme.fonts.label}`;
       ctx.textAlign = 'center';
-      ctx.fillText(this.theme.strings.pull, laneLeft + laneWidth / 2, laneBottom - this.sl(0.16));
+      ctx.textBaseline = 'top';
+      ctx.fillText(this.theme.strings.pull, laneLeft + laneWidth / 2, laneBottom + 4);
+      ctx.textBaseline = 'alphabetic';
     }
   }
 
@@ -347,6 +370,254 @@ export class Renderer {
     ctx.strokeStyle = t.down ? palette.wallColor : palette.accent;
     ctx.lineWidth = t.down ? 1 : 2;
     ctx.strokeRect(x, y, w, h);
+  }
+
+  // ─── Orbit ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Draws a smooth centripetal Catmull-Rom spline through normalized points.
+   *
+   * Uses alpha = 0.5 (centripetal parameterization), which weights each
+   * segment's tangent magnitude by the square-root of its chord length.
+   * This prevents the overshoot/divet artifacts that uniform Catmull-Rom
+   * produces when consecutive points have very different spacing — exactly
+   * what happens at the orbit's top corners where the short angled segments
+   * meet the long flat top segment.
+   *
+   * Endpoint tangents are clamped (ghost point = endpoint) so the spline
+   * starts and ends without overshoot.
+   */
+  private drawSmoothPolyline(pts: ReadonlyArray<{ x: number; y: number }>): void {
+    const { ctx } = this;
+    const n = pts.length;
+    if (n < 2) return;
+
+    const at = (i: number) => pts[Math.max(0, Math.min(n - 1, i))]!;
+
+    // Centripetal knot distance: |P_b - P_a|^0.5
+    const knotDist = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      return Math.sqrt(Math.sqrt(dx * dx + dy * dy)); // (d²)^0.25 = d^0.5
+    };
+
+    ctx.beginPath();
+    ctx.moveTo(this.sx(at(0).x), this.sy(at(0).y));
+
+    if (n === 2) {
+      ctx.lineTo(this.sx(at(1).x), this.sy(at(1).y));
+      ctx.stroke();
+      return;
+    }
+
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = at(i - 1);
+      const p1 = at(i);
+      const p2 = at(i + 1);
+      const p3 = at(i + 2);
+
+      // Knot intervals in arc-length parameter space
+      const dt01 = knotDist(p0, p1) || 1e-4;  // guard against coincident ghost pts
+      const dt12 = knotDist(p1, p2) || 1e-4;
+      const dt23 = knotDist(p2, p3) || 1e-4;
+
+      // Centripetal tangents at p1 and p2, scaled to the current interval dt12
+      const m1x = dt12 * ((p1.x - p0.x) / dt01 - (p2.x - p0.x) / (dt01 + dt12) + (p2.x - p1.x) / dt12);
+      const m1y = dt12 * ((p1.y - p0.y) / dt01 - (p2.y - p0.y) / (dt01 + dt12) + (p2.y - p1.y) / dt12);
+      const m2x = dt12 * ((p2.x - p1.x) / dt12 - (p3.x - p1.x) / (dt12 + dt23) + (p3.x - p2.x) / dt23);
+      const m2y = dt12 * ((p2.y - p1.y) / dt12 - (p3.y - p1.y) / (dt12 + dt23) + (p3.y - p2.y) / dt23);
+
+      ctx.bezierCurveTo(
+        this.sx(p1.x + m1x / 3), this.sy(p1.y + m1y / 3),
+        this.sx(p2.x - m2x / 3), this.sy(p2.y - m2y / 3),
+        this.sx(p2.x),           this.sy(p2.y),
+      );
+    }
+    ctx.stroke();
+  }
+
+  /**
+   * Extracts an ordered polyline from a chain of connected wall segments.
+   * Each segment's end point is the next segment's start point.
+   */
+  private segsToPoints(segs: ReadonlyArray<{ x1: number; y1: number; x2: number; y2: number }>): Array<{ x: number; y: number }> {
+    if (segs.length === 0) return [];
+    const first = segs[0]!;
+    const pts: Array<{ x: number; y: number }> = [{ x: first.x1, y: first.y1 }];
+    for (const s of segs) pts.push({ x: s.x2, y: s.y2 });
+    return pts;
+  }
+
+  private drawOrbit(rc: RenderContext, palette: ColorPalette): void {
+    if (this.theme.drawOrbit) {
+      this.theme.drawOrbit(rc, palette);
+      return;
+    }
+    const { ctx } = this;
+    ctx.strokeStyle = palette.orbitRailColor;
+    ctx.lineWidth = 2;
+
+    // Outer wall: ORBIT_OUTER_WALLS + ORBIT_OUTER_WALLS_ONEWAY form one
+    // continuous chain — draw as a single smooth curve.
+    const outerPts = [
+      ...this.segsToPoints(ORBIT_OUTER_WALLS),
+      // ONEWAY picks up where OUTER_WALLS ends; drop the duplicated junction point
+      ...this.segsToPoints(ORBIT_OUTER_WALLS_ONEWAY).slice(1),
+    ];
+    this.drawSmoothPolyline(outerPts);
+
+    // Inner walls: two separate chains with a deliberate gap at the top.
+    const innerLeft  = ORBIT_INNER_WALLS.slice(0, 4);   // left chain (4 segs)
+    const innerRight = ORBIT_INNER_WALLS.slice(4);        // right chain (4 segs)
+    this.drawSmoothPolyline(this.segsToPoints(innerLeft));
+    this.drawSmoothPolyline(this.segsToPoints(innerRight));
+
+    // Entry/exit indicators (small circles at lane openings)
+    ctx.lineWidth = 1.5;
+    const r = this.sl(0.015);
+    ctx.beginPath();
+    ctx.arc(this.sx(ORBIT_LEFT.x), this.sy(ORBIT_LEFT.y), r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(this.sx(ORBIT_RIGHT.x), this.sy(ORBIT_RIGHT.y), r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // ─── Lock Scoop ─────────────────────────────────────────────────────────────
+
+  private drawScoop(lock: BallLockState, rc: RenderContext, palette: ColorPalette): void {
+    if (this.theme.drawScoop) {
+      this.theme.drawScoop(rc, lock, palette);
+      return;
+    }
+    const { ctx } = this;
+    const cx = this.sx(LOCK_SCOOP.x);
+    const cy = this.sy(LOCK_SCOOP.y);
+    const r = this.sl(LOCK_SCOOP.radius);
+    const isLit = lock.lockLit;
+
+    // Scoop pocket (semicircle opening upward)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI);
+    ctx.closePath();
+    ctx.fillStyle = isLit ? palette.scoopLitColor : palette.scoopColor;
+    ctx.globalAlpha = isLit ? 0.5 : 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = isLit ? palette.scoopLitColor : palette.wallColor;
+    ctx.lineWidth = isLit ? 3 : 2;
+    ctx.stroke();
+
+    // Glow when lit
+    if (isLit) {
+      const grd = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 2);
+      grd.addColorStop(0, 'rgba(0, 255, 200, 0.25)');
+      grd.addColorStop(1, 'rgba(0, 255, 200, 0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 2, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+
+    // Lock indicators (small dots showing how many balls are locked)
+    const dotR = Math.max(2, r * 0.18);
+    const dotSpacing = dotR * 3;
+    for (let i = 0; i < lock.ballsToLock; i++) {
+      const dx = cx + (i - (lock.ballsToLock - 1) / 2) * dotSpacing;
+      const dy = cy + r * 1.6;
+      ctx.beginPath();
+      ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = i < lock.ballsLocked
+        ? palette.lockIndicatorColor
+        : palette.scoopColor;
+      ctx.fill();
+    }
+  }
+
+  // ─── Rollovers ──────────────────────────────────────────────────────────────
+
+  private drawRollovers(rollovers: RolloverLane[], rc: RenderContext, palette: ColorPalette): void {
+    for (const ro of rollovers) {
+      if (this.theme.drawRollover) {
+        this.theme.drawRollover(rc, ro, palette);
+      } else {
+        this.drawDefaultRollover(ro, palette);
+      }
+    }
+  }
+
+  private drawDefaultRollover(ro: RolloverLane, palette: ColorPalette): void {
+    const { ctx } = this;
+    const cx = this.sx(ro.position.x);
+    const cy = this.sy(ro.position.y);
+    const r = this.sl(ro.radius);
+
+    // Diamond shape
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r * 0.6, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r * 0.6, cy);
+    ctx.closePath();
+
+    if (ro.lit) {
+      ctx.fillStyle = palette.rolloverLitColor;
+      ctx.fill();
+      // Glow
+      ctx.shadowColor = palette.rolloverLitColor;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = palette.rolloverColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // ─── Slingshots ──────────────────────────────────────────────────────────────
+
+  private drawSlingshots(slingshots: Slingshot[], rc: RenderContext, palette: ColorPalette): void {
+    for (const sling of slingshots) {
+      if (this.theme.drawSlingshot) {
+        this.theme.drawSlingshot(rc, sling, palette);
+      } else {
+        this.drawDefaultSlingshot(sling, palette);
+      }
+    }
+  }
+
+  private drawDefaultSlingshot(sling: Slingshot, palette: ColorPalette): void {
+    const { ctx } = this;
+    const [v0, v1, v2] = sling.vertices;
+
+    // Filled triangle
+    ctx.beginPath();
+    ctx.moveTo(this.sx(v0.x), this.sy(v0.y));
+    ctx.lineTo(this.sx(v1.x), this.sy(v1.y));
+    ctx.lineTo(this.sx(v2.x), this.sy(v2.y));
+    ctx.closePath();
+
+    ctx.fillStyle = sling.lit ? palette.slingshotLitColor : palette.slingshotColor;
+    ctx.globalAlpha = sling.lit ? 0.6 : 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Border
+    ctx.strokeStyle = palette.wallColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Highlight the kick edge with a thicker, brighter line
+    const ki = sling.kickEdgeIndex;
+    const kv1 = sling.vertices[ki]!;
+    const kv2 = sling.vertices[(ki + 1) % 3]!;
+    ctx.strokeStyle = sling.lit ? palette.accent : palette.slingshotColor;
+    ctx.lineWidth = sling.lit ? 4 : 3;
+    ctx.beginPath();
+    ctx.moveTo(this.sx(kv1.x), this.sy(kv1.y));
+    ctx.lineTo(this.sx(kv2.x), this.sy(kv2.y));
+    ctx.stroke();
   }
 
   // ─── Flippers ───────────────────────────────────────────────────────────────
@@ -486,7 +757,7 @@ export class Renderer {
     ctx.fillStyle = palette.labelColor;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(`[T] ${this.theme.name}`, this.tableX + this.tableW - 4, hudY + hudH + 6);
+    ctx.fillText(this.theme.name, this.tableX + this.tableW - 4, hudY + hudH + 6);
 
     ctx.textBaseline = 'alphabetic';
   }
@@ -498,15 +769,15 @@ export class Renderer {
 
     const { ctx } = this;
     const cx = this.tableX + this.tableW / 2;
-    const cy = this.tableY + this.tableH * 0.42;
+    const cy = this.tableY + this.tableH * 0.44;
 
     // Fade the last 400ms
-    const alpha = Math.min(1, state.mission.bannerTimer / 400);
+    const alpha = Math.min(0.7, state.mission.bannerTimer / 400);
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const size = Math.round(this.tableW * 0.12);
-    ctx.font = `900 ${size}px ${this.theme.fonts.title}`;
+    const size = Math.round(this.tableW * 0.065);
+    ctx.font = `700 ${size}px ${this.theme.fonts.label}`;
     ctx.fillStyle = palette.accent;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
