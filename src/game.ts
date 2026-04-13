@@ -239,17 +239,28 @@ export class Game {
           }
         }
 
-        for (const ro of state.rollovers) {
-          if (!ro.lit && checkRollover(ball, ro.position.x, ro.position.y, ROLLOVER_RADIUS)) {
-            ro.lit = true;
-            state.score += ro.scoreValue * state.mission.multiplier;
-            this.audio.play('rollover');
-            this.checkRolloversComplete();
-          }
-        }
-
         collideBallFlipper(ball, state.flippers[0]);
         collideBallFlipper(ball, state.flippers[1]);
+      }
+
+      // Rollover detection — outside the substep loop so each rollover
+      // toggles at most once per frame per ball (entry-edge detection).
+      if (!ball.touchingRollovers) ball.touchingRollovers = new Set();
+      for (const ro of state.rollovers) {
+        const touching = checkRollover(ball, ro.position.x, ro.position.y, ROLLOVER_RADIUS);
+        const wasTouching = ball.touchingRollovers.has(ro.id);
+        if (touching && !wasTouching) {
+          // Ball just entered this rollover zone — toggle it
+          ro.lit = !ro.lit;
+          state.score += ro.scoreValue * state.mission.multiplier;
+          this.audio.play('rollover');
+          if (ro.lit) this.checkRolloversComplete();
+        }
+        if (touching) {
+          ball.touchingRollovers.add(ro.id);
+        } else {
+          ball.touchingRollovers.delete(ro.id);
+        }
       }
     }
 
@@ -420,27 +431,58 @@ export class Game {
     state.mission.phase = 'complete';
     this.audio.play('missionComplete');
 
-    // Reset the drop-target bank so it can be cleared again.
-    for (const t of state.dropTargets) t.down = false;
+    // If the lock is not yet lit, check if rollovers are also complete.
+    // tryLightLock will reset both if it lights the lock. If lock doesn't light
+    // (rollovers not done yet), targets stay down as a visual indicator.
+    // If the lock IS already lit, just reset targets so the player can keep
+    // clearing banks for points while waiting to reach the scoop.
+    if (state.mission.lock.phase === 'lit') {
+      for (const t of state.dropTargets) t.down = false;
+    } else {
+      this.tryLightLock();
+    }
   }
 
   // ─── Ball Lock / Multiball System ───────────────────────────────────────────
 
-  /** Called when a rollover is lit — checks if all rollovers are complete. */
+  /** Called when a rollover is lit — checks if both conditions are met to light the lock. */
   private checkRolloversComplete(): void {
     const { state } = this;
-    if (state.mission.lock.phase !== 'idle') return;
     if (!state.rollovers.every(r => r.lit)) return;
 
-    // All rollovers lit — light the lock!
+    state.mission.bannerText = 'ROLLOVERS COMPLETE';
+    state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
+
+    if (state.mission.lock.phase === 'lit') {
+      // Lock is already lit — just reset rollovers so the player can keep
+      // scoring them while waiting to reach the scoop.
+      for (const r of state.rollovers) r.lit = false;
+    } else if (state.mission.lock.phase === 'idle') {
+      // Check if drop targets are also all down — if so, light the lock
+      this.tryLightLock();
+    }
+  }
+
+  /** Check if both all rollovers are lit AND all drop targets are down.
+   *  If so, light the lock and reset both for the next cycle. */
+  private tryLightLock(): void {
+    const { state } = this;
+    if (state.mission.lock.phase !== 'idle') return;
+
+    const allRolloversLit = state.rollovers.every(r => r.lit);
+    const allTargetsDown = state.dropTargets.every(t => t.down);
+    if (!allRolloversLit || !allTargetsDown) return;
+
+    // Both conditions met — light the lock!
     state.mission.lock.phase = 'lit';
     state.mission.lock.lockLit = true;
     state.mission.bannerText = 'LOCK IS LIT';
     state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
     this.audio.play('missionComplete');
 
-    // Reset rollovers for next cycle
+    // Reset both rollovers and drop targets for the next lock cycle
     for (const r of state.rollovers) r.lit = false;
+    for (const t of state.dropTargets) t.down = false;
   }
 
   /** Per-frame check: is any active ball inside the lock scoop? */
@@ -465,10 +507,18 @@ export class Game {
         this.triggerMultiball();
       } else {
         // Ball locked, serve a new ball (does NOT consume ballsRemaining)
-        lock.phase = 'locked';
+        // Reset lock phase to idle so player must complete drop targets +
+        // rollovers again before locking the next ball.
+        lock.phase = 'idle';
+        lock.lockLit = false;
         state.mission.bannerText = `BALL ${lock.ballsLocked} LOCKED`;
         state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
         this.audio.play('lockBall');
+
+        // Reset drop targets and rollovers for the next lock cycle
+        for (const t of state.dropTargets) t.down = false;
+        for (const r of state.rollovers) r.lit = false;
+
         this.serveLockBall();
       }
       return; // only lock one ball per frame
@@ -492,6 +542,10 @@ export class Game {
     state.mission.bannerText = 'MULTIBALL!';
     state.mission.bannerTimer = MISSION_BANNER_DURATION_MS;
     this.audio.play('missionComplete');
+
+    // Reset drop targets and rollovers for post-multiball cycle
+    for (const t of state.dropTargets) t.down = false;
+    for (const r of state.rollovers) r.lit = false;
 
     // Spawn ballsToLock balls spread across the playfield
     const spawnCount = lock.ballsToLock;

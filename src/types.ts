@@ -19,6 +19,9 @@ export interface Ball {
    *  exit or when the ball leaves the orbit area. Used to detect full orbit
    *  traversals (enter one side, exit the other) for bonus scoring. */
   orbitEnteredFrom?: 'left' | 'right';
+  /** IDs of rollovers the ball is currently overlapping. Used to detect
+   *  entry/exit edges so a rollover only toggles once per pass-through. */
+  touchingRollovers?: Set<string>;
 }
 
 export type FlipperSide = 'left' | 'right';
