@@ -12,7 +12,6 @@ import {
   DROP_TARGET_BONUS,
   GUIDE_WALLS,
   HIGH_SCORE_KEY,
-  LAUNCH_LANE_CURVE,
   BALLS_TO_LOCK,
   LOCK_SCOOP,
   MISSION_BANNER_DURATION_MS,
@@ -218,10 +217,6 @@ export class Game {
         }
 
         for (const seg of GUIDE_WALLS) {
-          collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
-        }
-
-        for (const seg of LAUNCH_LANE_CURVE) {
           collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
         }
 

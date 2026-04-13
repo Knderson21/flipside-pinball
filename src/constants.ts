@@ -160,8 +160,8 @@ export const ORBIT_OUTER_WALLS: ReadonlyArray<WallSegment> = [
 // right. Balls moving upward from the launch lane pass through; balls falling
 // inside the orbit are blocked and guided toward the playfield.
 export const ORBIT_OUTER_WALLS_ONEWAY: ReadonlyArray<WallSegment> = [
-  { x1: 0.950, y1: 0.240, x2: 0.932, y2: 0.350 },   // down right wall
-  { x1: 0.932, y1: 0.350, x2: 0.904, y2: 0.460 },   // right → exit
+  { x1: 0.950, y1: 0.240, x2: 0.932, y2: 0.400 },   // down right wall
+  { x1: 0.932, y1: 0.400, x2: 0.870, y2: 0.500 },   // right → exit
 ];
 
 // Inner wall — offset ~0.08 inward from outer wall.
@@ -176,8 +176,8 @@ export const ORBIT_INNER_WALLS: ReadonlyArray<WallSegment> = [
   // Right inner wall (mirror of left, gap to exit)
   { x1: 0.794, y1: 0.145, x2: 0.836, y2: 0.173 },   // gap ends here
   { x1: 0.836, y1: 0.173, x2: 0.867, y2: 0.249 },
-  { x1: 0.867, y1: 0.249, x2: 0.854, y2: 0.334 },
-  { x1: 0.854, y1: 0.334, x2: 0.824, y2: 0.460 },
+  { x1: 0.867, y1: 0.249, x2: 0.854, y2: 0.370 },
+  { x1: 0.854, y1: 0.370, x2: 0.800, y2: 0.460 },
 ];
 
 // Center path for rendering — midpoint between outer and inner walls.
@@ -240,20 +240,6 @@ export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
 
 export const SLINGSHOT_RESTITUTION = 1.10;
 export const SLINGSHOT_LIT_DURATION_MS = 200;
-
-// ─── Launch Lane Curve ────────────────────────────────────────────────────────
-// Outer rail of the curved launch lane. These segments trace the right wall
-// curving inward at the top-right corner, guiding the ball around the corner
-// and into the upper playfield. Approximates the quadratic Bezier from
-// (0.95, 0.14) through control point (0.95, 0.04) to (0.870, 0.04).
-
-export const LAUNCH_LANE_CURVE: ReadonlyArray<WallSegment> = [
-  { x1: 0.950, y1: 0.140, x2: 0.947, y2: 0.104 },
-  { x1: 0.947, y1: 0.104, x2: 0.937, y2: 0.076 },
-  { x1: 0.937, y1: 0.076, x2: 0.921, y2: 0.056 },
-  { x1: 0.921, y1: 0.056, x2: 0.899, y2: 0.044 },
-  { x1: 0.899, y1: 0.044, x2: 0.870, y2: 0.040 },
-];
 
 export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [
   // Upper inlane guides — endpoints stop 0.02 units ABOVE each flipper pivot.

@@ -11,7 +11,7 @@ import type {
   Slingshot,
   ThemePack,
 } from './types';
-import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LAUNCH_LANE_CURVE, LOCK_SCOOP, ORBIT_INNER_WALLS, ORBIT_LEFT, ORBIT_OUTER_WALLS, ORBIT_OUTER_WALLS_ONEWAY, ORBIT_RIGHT, TABLE, TABLE_ASPECT } from './constants';
+import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LOCK_SCOOP, ORBIT_INNER_WALLS, ORBIT_LEFT, ORBIT_OUTER_WALLS, ORBIT_OUTER_WALLS_ONEWAY, ORBIT_RIGHT, TABLE, TABLE_ASPECT } from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
@@ -128,7 +128,6 @@ export class Renderer {
     }
 
     this.drawPlungerLane(state, palette);
-    this.drawLaunchLaneCurve(rc, palette);
     this.drawOrbit(rc, palette);
     this.drawScoop(state.mission.lock, rc, palette);
     this.drawDropTargets(state.dropTargets, rc, palette);
@@ -203,27 +202,6 @@ export class Renderer {
       ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
       ctx.stroke();
     }
-  }
-
-  // ─── Launch Lane Curve ───────────────────────────────────────────────────────
-
-  private drawLaunchLaneCurve(rc: RenderContext, palette: ColorPalette): void {
-    if (this.theme.drawLaunchLane) {
-      this.theme.drawLaunchLane(rc, palette);
-      return;
-    }
-    const { ctx } = this;
-
-    // Draw the outer rail of the curved launch lane (right wall curving inward)
-    ctx.strokeStyle = palette.wallColor;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    const first = LAUNCH_LANE_CURVE[0]!;
-    ctx.moveTo(this.sx(first.x1), this.sy(first.y1));
-    for (const seg of LAUNCH_LANE_CURVE) {
-      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
-    }
-    ctx.stroke();
   }
 
   // ─── Plunger Lane ───────────────────────────────────────────────────────────

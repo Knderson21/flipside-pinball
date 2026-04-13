@@ -258,5 +258,4 @@ export interface ThemePack {
   drawRollover?: (rc: RenderContext, rollover: RolloverLane, palette: ColorPalette) => void;
   drawScoop?: (rc: RenderContext, lock: BallLockState, palette: ColorPalette) => void;
   drawOrbit?: (rc: RenderContext, palette: ColorPalette) => void;
-  drawLaunchLane?: (rc: RenderContext, palette: ColorPalette) => void;
 }
