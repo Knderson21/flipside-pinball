@@ -242,8 +242,8 @@ export class Renderer {
     ctx.strokeStyle = palette.wallColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    // Lane left wall stops at y=0.14 where the curved launch lane begins
-    ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(0.14));
+    // Lane left wall stops at y=0.5
+    ctx.moveTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(0.5));
     ctx.lineTo(this.sx(TABLE.PLUNGER_LANE_LEFT), this.sy(TABLE.DRAIN_Y));
     ctx.stroke();
 

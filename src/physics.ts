@@ -84,7 +84,7 @@ export function collideBallWalls(ball: Ball): void {
   // Plunger lane left wall — one-way exit only.
   // A ball seated in the lane (inPlunger) is kept inside; any other ball is
   // immediately pushed back into the playfield so it can never re-enter the lane.
-  const LANE_EXIT_Y = 0.14;
+  const LANE_EXIT_Y = 0.5;
   if (ball.position.y > LANE_EXIT_Y) {
     if (ball.inPlunger) {
       // Keep the lane ball inside the lane.

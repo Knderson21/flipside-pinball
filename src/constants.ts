@@ -34,14 +34,14 @@ export const TABLE = {
   TOP_WALL: 0.04,
   DRAIN_Y: 0.97,
 
-  PLUNGER_X: 0.885,
-  PLUNGER_LANE_LEFT: 0.825,
+  PLUNGER_X: 0.910,
+  PLUNGER_LANE_LEFT: 0.870,
 
   FLIPPER_Y: 0.87,
-  LEFT_FLIPPER_X: 0.24,
-  RIGHT_FLIPPER_X: 0.635,
+  LEFT_FLIPPER_X: 0.251,
+  RIGHT_FLIPPER_X: 0.669,
 
-  BALL_SPAWN_X: 0.885,
+  BALL_SPAWN_X: 0.910,
   BALL_SPAWN_Y: 0.84,
 
   LANE_FLOOR_Y: 0.91,
@@ -57,11 +57,11 @@ export const RIGHT_FLIPPER_ACTIVE_ANGLE = Math.PI + 0.45;
 // ─── Default Bumper Layout ────────────────────────────────────────────────────
 
 export const DEFAULT_BUMPERS: ReadonlyArray<{ x: number; y: number; score: number }> = [
-  { x: 0.4375, y: 0.20, score: 100 },
-  { x: 0.2875, y: 0.28, score: 100 },
-  { x: 0.5875, y: 0.28, score: 100 },
-  { x: 0.3375, y: 0.38, score: 75 },
-  { x: 0.5375, y: 0.38, score: 75 },
+  { x: 0.460, y: 0.20, score: 100 },
+  { x: 0.301, y: 0.28, score: 100 },
+  { x: 0.619, y: 0.28, score: 100 },
+  { x: 0.354, y: 0.38, score: 75 },
+  { x: 0.566, y: 0.38, score: 75 },
 ] as const;
 
 export const BUMPER_RADIUS = 0.045;
@@ -79,9 +79,9 @@ export interface DropTargetDef {
 }
 
 export const DEFAULT_DROP_TARGETS: ReadonlyArray<DropTargetDef> = [
-  { x: 0.3375, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
-  { x: 0.4375, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
-  { x: 0.5375, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.354, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.460, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
+  { x: 0.566, y: 0.55, halfWidth: 0.035, halfHeight: 0.012, score: 250 },
 ] as const;
 
 // ─── Guide Wall Segments ──────────────────────────────────────────────────────
@@ -104,9 +104,9 @@ export interface RolloverDef {
 }
 
 export const DEFAULT_ROLLOVERS: ReadonlyArray<RolloverDef> = [
-  { x: 0.2675, y: 0.12, score: 25 },
-  { x: 0.4375, y: 0.12, score: 25 },
-  { x: 0.6075, y: 0.12, score: 25 },
+  { x: 0.280, y: 0.12, score: 25 },
+  { x: 0.460, y: 0.12, score: 25 },
+  { x: 0.640, y: 0.12, score: 25 },
 ] as const;
 
 export const ROLLOVER_RADIUS = 0.022;
@@ -116,7 +116,7 @@ export const ROLLOVER_RADIUS = 0.022;
 // drop targets. When the lock is lit, a ball entering the scoop is captured.
 
 export const LOCK_SCOOP = {
-  x: 0.4375,
+  x: 0.460,
   y: 0.48,
   radius: 0.032,
 } as const;
@@ -133,53 +133,53 @@ export const ORBIT_MIN_SPEED = 0.001;
 export const ORBIT_ENTRY_RADIUS = 0.04;
 
 // Entry/exit zones at the bottom of each side of the lane
-export const ORBIT_LEFT = { x: 0.090, y: 0.460 };
-export const ORBIT_RIGHT = { x: 0.785, y: 0.460 };
+export const ORBIT_LEFT = { x: 0.150, y: 0.460 };
+export const ORBIT_RIGHT = { x: 0.770, y: 0.460 };
 
 // Outer wall — follows the perimeter of the lane (full loop, left to right)
 export const ORBIT_OUTER_WALLS: ReadonlyArray<WallSegment> = [
-  { x1: 0.090, y1: 0.460, x2: 0.080, y2: 0.350 },   // left entry → up
-  { x1: 0.080, y1: 0.350, x2: 0.085, y2: 0.240 },   // up left wall
-  { x1: 0.085, y1: 0.240, x2: 0.110, y2: 0.150 },   // mid-left
-  { x1: 0.110, y1: 0.150, x2: 0.180, y2: 0.090 },   // upper-left corner
-  { x1: 0.180, y1: 0.090, x2: 0.300, y2: 0.065 },   // rounding top-left
-  { x1: 0.300, y1: 0.065, x2: 0.575, y2: 0.065 },   // along top
-  { x1: 0.575, y1: 0.065, x2: 0.695, y2: 0.090 },   // rounding top-right
-  { x1: 0.695, y1: 0.090, x2: 0.765, y2: 0.150 },   // upper-right corner
-  { x1: 0.765, y1: 0.150, x2: 0.790, y2: 0.240 },   // mid-right
-  { x1: 0.790, y1: 0.240, x2: 0.795, y2: 0.350 },   // down right wall
-  { x1: 0.795, y1: 0.350, x2: 0.785, y2: 0.460 },   // right → exit
+  { x1: 0.110, y1: 0.460, x2: 0.082, y2: 0.350 },   // left entry → up
+  { x1: 0.082, y1: 0.350, x2: 0.064, y2: 0.240 },   // up left wall
+  { x1: 0.064, y1: 0.240, x2: 0.113, y2: 0.120 },   // mid-left
+  { x1: 0.113, y1: 0.120, x2: 0.188, y2: 0.070 },   // upper-left corner
+  { x1: 0.188, y1: 0.070, x2: 0.315, y2: 0.042 },   // rounding top-left
+  { x1: 0.315, y1: 0.042, x2: 0.605, y2: 0.042 },   // along top
+  { x1: 0.605, y1: 0.042, x2: 0.732, y2: 0.070 },   // rounding top-right
+  { x1: 0.732, y1: 0.070, x2: 0.807, y2: 0.120 },   // upper-right corner
+  { x1: 0.807, y1: 0.120, x2: 0.856, y2: 0.240 },   // mid-right
+  { x1: 0.856, y1: 0.240, x2: 0.838, y2: 0.350 },   // down right wall
+  { x1: 0.838, y1: 0.350, x2: 0.810, y2: 0.460 },   // right → exit
 ];
 
-// Inner wall — offset ~0.06 inward from outer wall.
+// Inner wall — offset 0.08 inward from outer wall (perpendicular miter offset).
 // Gap between left and right sections at the top lets balls fall to rollovers.
 export const ORBIT_INNER_WALLS: ReadonlyArray<WallSegment> = [
   // Left inner wall (entry up to gap)
-  { x1: 0.150, y1: 0.460, x2: 0.143, y2: 0.350 },
-  { x1: 0.143, y1: 0.350, x2: 0.148, y2: 0.240 },
-  { x1: 0.148, y1: 0.240, x2: 0.175, y2: 0.165 },
-  { x1: 0.175, y1: 0.165, x2: 0.230, y2: 0.120 },   // gap starts here
+  { x1: 0.190, y1: 0.460, x2: 0.160, y2: 0.334 },
+  { x1: 0.160, y1: 0.334, x2: 0.147, y2: 0.249 },
+  { x1: 0.147, y1: 0.249, x2: 0.178, y2: 0.173 },
+  { x1: 0.178, y1: 0.173, x2: 0.220, y2: 0.145 },   // gap starts here
   // Right inner wall (gap to exit)
-  { x1: 0.645, y1: 0.120, x2: 0.700, y2: 0.165 },   // gap ends here
-  { x1: 0.700, y1: 0.165, x2: 0.727, y2: 0.240 },
-  { x1: 0.727, y1: 0.240, x2: 0.732, y2: 0.350 },
-  { x1: 0.732, y1: 0.350, x2: 0.725, y2: 0.460 },
+  { x1: 0.700, y1: 0.145, x2: 0.742, y2: 0.173 },   // gap ends here
+  { x1: 0.742, y1: 0.173, x2: 0.773, y2: 0.249 },
+  { x1: 0.773, y1: 0.249, x2: 0.760, y2: 0.334 },
+  { x1: 0.760, y1: 0.334, x2: 0.730, y2: 0.460 },
 ];
 
-// Center path for rendering (dashed guide line)
+// Center path for rendering (dashed guide line) — midpoint between outer and inner walls
 export const ORBIT_PATH: ReadonlyArray<{ x: number; y: number }> = [
-  { x: 0.090, y: 0.460 },
-  { x: 0.080, y: 0.350 },
-  { x: 0.085, y: 0.240 },
-  { x: 0.110, y: 0.150 },
-  { x: 0.180, y: 0.090 },
-  { x: 0.300, y: 0.065 },
-  { x: 0.575, y: 0.065 },
-  { x: 0.695, y: 0.090 },
-  { x: 0.765, y: 0.150 },
-  { x: 0.790, y: 0.240 },
-  { x: 0.795, y: 0.350 },
-  { x: 0.785, y: 0.460 },
+  { x: 0.150, y: 0.460 },
+  { x: 0.121, y: 0.342 },
+  { x: 0.106, y: 0.245 },
+  { x: 0.146, y: 0.147 },
+  { x: 0.204, y: 0.108 },
+  { x: 0.320, y: 0.082 },
+  { x: 0.600, y: 0.082 },
+  { x: 0.716, y: 0.108 },
+  { x: 0.775, y: 0.147 },
+  { x: 0.815, y: 0.245 },
+  { x: 0.799, y: 0.342 },
+  { x: 0.770, y: 0.460 },
 ];
 
 // ─── Slingshot Layout ─────────────────────────────────────────────────────────
@@ -201,24 +201,24 @@ export interface SlingshotDef {
 export const DEFAULT_SLINGSHOTS: ReadonlyArray<SlingshotDef> = [
   {
     // Left slingshot: between left wall and left flipper
-    // Wall-side at x=0.11 leaves 0.06 gap from LEFT_WALL (0.05) for ball to pass behind.
+    // Wall-side at x=0.124 leaves ~0.074 gap from LEFT_WALL (0.05) for ball to pass behind.
     // Bottom corner (v2) raised to y=0.78 so ball can roll underneath.
-    v0: { x: 0.12, y: 0.68 },   // upper corner (near wall)
-    v1: { x: 0.22, y: 0.7916 },   // lower-right (near flipper)
-    v2: { x: 0.12, y: 0.76 },   // lower-left (near wall) — raised to open bottom passage
-    kickEdge: 0,                 // v0→v1 is the hypotenuse (playfield-facing)
-    openEdge: 1,                 // v1→v2 is the open bottom — ball rolls freely underneath
+    v0: { x: 0.124, y: 0.68 },   // upper corner (near wall)
+    v1: { x: 0.230, y: 0.7916 },   // lower-right (near flipper)
+    v2: { x: 0.124, y: 0.76 },   // lower-left (near wall) — raised to open bottom passage
+    kickEdge: 0,                  // v0→v1 is the hypotenuse (playfield-facing)
+    openEdge: 1,                  // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
   {
     // Right slingshot: between right flipper and plunger lane
-    // Wall-side at x=0.765 leaves 0.06 gap from PLUNGER_LANE_LEFT (0.825) for ball to pass behind.
+    // Wall-side at x=0.796 leaves ~0.074 gap from PLUNGER_LANE_LEFT (0.870) for ball to pass behind.
     // Bottom corner (v1) raised to y=0.78 so ball can roll underneath.
-    v0: { x: 0.755, y: 0.68 },  // upper corner (near lane wall)
-    v1: { x: 0.755, y: 0.76 },  // lower-right (near lane wall) — raised to open bottom passage
-    v2: { x: 0.655, y: 0.7916 },  // lower-left (near flipper)
-    kickEdge: 2,                 // v2→v0 is the hypotenuse (playfield-facing)
-    openEdge: 1,                 // v1→v2 is the open bottom — ball rolls freely underneath
+    v0: { x: 0.796, y: 0.68 },  // upper corner (near lane wall)
+    v1: { x: 0.796, y: 0.76 },  // lower-right (near lane wall) — raised to open bottom passage
+    v2: { x: 0.690, y: 0.7916 },  // lower-left (near flipper)
+    kickEdge: 2,                  // v2→v0 is the hypotenuse (playfield-facing)
+    openEdge: 1,                  // v1→v2 is the open bottom — ball rolls freely underneath
     score: 50,
   },
 ] as const;
@@ -230,14 +230,14 @@ export const SLINGSHOT_LIT_DURATION_MS = 200;
 // Outer rail of the curved launch lane. These segments trace the right wall
 // curving inward at the top-right corner, guiding the ball around the corner
 // and into the upper playfield. Approximates the quadratic Bezier from
-// (0.95, 0.14) through control point (0.95, 0.04) to (0.825, 0.04).
+// (0.95, 0.14) through control point (0.95, 0.04) to (0.870, 0.04).
 
 export const LAUNCH_LANE_CURVE: ReadonlyArray<WallSegment> = [
-  { x1: 0.950, y1: 0.140, x2: 0.945, y2: 0.104 },
-  { x1: 0.945, y1: 0.104, x2: 0.930, y2: 0.076 },
-  { x1: 0.930, y1: 0.076, x2: 0.905, y2: 0.056 },
-  { x1: 0.905, y1: 0.056, x2: 0.870, y2: 0.044 },
-  { x1: 0.870, y1: 0.044, x2: 0.825, y2: 0.040 },
+  { x1: 0.950, y1: 0.140, x2: 0.947, y2: 0.104 },
+  { x1: 0.947, y1: 0.104, x2: 0.937, y2: 0.076 },
+  { x1: 0.937, y1: 0.076, x2: 0.921, y2: 0.056 },
+  { x1: 0.921, y1: 0.056, x2: 0.899, y2: 0.044 },
+  { x1: 0.899, y1: 0.044, x2: 0.870, y2: 0.040 },
 ];
 
 export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [
@@ -248,6 +248,6 @@ export const GUIDE_WALLS: ReadonlyArray<WallSegment> = [
   { x1: TABLE.LEFT_WALL,                y1: TABLE.FLIPPER_Y - 0.08, x2: TABLE.LEFT_FLIPPER_X,  y2: TABLE.FLIPPER_Y - 0.02 },
   { x1: TABLE.PLUNGER_LANE_LEFT,        y1: TABLE.FLIPPER_Y - 0.08, x2: TABLE.RIGHT_FLIPPER_X, y2: TABLE.FLIPPER_Y - 0.02 },
   // Lower outlane guides (below and outside the flippers)
-  { x1: TABLE.LEFT_WALL + 0.04,         y1: TABLE.FLIPPER_Y + 0.04, x2: TABLE.LEFT_FLIPPER_X  - 0.06, y2: TABLE.FLIPPER_Y + 0.01 },
-  { x1: TABLE.PLUNGER_LANE_LEFT - 0.04, y1: TABLE.FLIPPER_Y + 0.04, x2: TABLE.RIGHT_FLIPPER_X + 0.06, y2: TABLE.FLIPPER_Y + 0.01 },
+  { x1: TABLE.LEFT_WALL + 0.042,         y1: TABLE.FLIPPER_Y + 0.04, x2: TABLE.LEFT_FLIPPER_X  - 0.063, y2: TABLE.FLIPPER_Y + 0.01 },
+  { x1: TABLE.PLUNGER_LANE_LEFT - 0.042, y1: TABLE.FLIPPER_Y + 0.04, x2: TABLE.RIGHT_FLIPPER_X + 0.063, y2: TABLE.FLIPPER_Y + 0.01 },
 ];
