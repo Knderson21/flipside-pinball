@@ -7,6 +7,7 @@ import {
   collideBallDropTarget,
   collideBallFlipper,
   collideBallSegment,
+  collideBallSegmentOneSided,
   collideBallSlingshot,
   collideBallWalls,
   isBallDrained,
@@ -251,6 +252,56 @@ describe('collideBallSegment', () => {
   it('returns false when the ball is not touching the segment', () => {
     const ball = makeBall({ position: { x: 0.1, y: 0.1 } });
     const hit = collideBallSegment(ball, 0.8, 0.8, 0.9, 0.9);
+    expect(hit).toBe(false);
+  });
+});
+
+// ─── collideBallSegmentOneSided ──────────────────────────────────────────────
+
+describe('collideBallSegmentOneSided', () => {
+  // Segment goes from top-right to bottom-left (like orbit bottom-right outer wall).
+  // Inner side (left of direction) = orbit interior = positive cross product.
+  const seg = { x1: 0.950, y1: 0.220, x2: 0.900, y2: 0.460 };
+
+  it('collides when ball is on the inner side and moving downward', () => {
+    // Ball inside the orbit lane, falling back down
+    const ball = makeBall({
+      position: { x: 0.910, y: 0.340 },
+      velocity: { x: 0.001, y: 0.001 },
+    });
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(true);
+  });
+
+  it('passes through when ball is moving upward even on inner side', () => {
+    // Ball inside the orbit lane but still traveling upward — don't block
+    const ball = makeBall({
+      position: { x: 0.910, y: 0.340 },
+      velocity: { x: 0.001, y: -0.002 },
+    });
+    const origX = ball.position.x;
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(false);
+    expect(ball.position.x).toBe(origX);
+  });
+
+  it('passes through when ball is on the outer (right) side of the segment', () => {
+    // Ball to the right of the segment — in the launch lane area
+    const ball = makeBall({
+      position: { x: 0.945, y: 0.340 },
+      velocity: { x: -0.001, y: 0.001 },
+    });
+    const origX = ball.position.x;
+    const origVx = ball.velocity.x;
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+    expect(hit).toBe(false);
+    expect(ball.position.x).toBe(origX);
+    expect(ball.velocity.x).toBe(origVx);
+  });
+
+  it('returns false when ball is far from the segment', () => {
+    const ball = makeBall({ position: { x: 0.1, y: 0.1 } });
+    const hit = collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
     expect(hit).toBe(false);
   });
 });

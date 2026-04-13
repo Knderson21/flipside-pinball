@@ -133,53 +133,68 @@ export const ORBIT_MIN_SPEED = 0.001;
 export const ORBIT_ENTRY_RADIUS = 0.04;
 
 // Entry/exit zones at the bottom of each side of the lane
-export const ORBIT_LEFT = { x: 0.150, y: 0.460 };
-export const ORBIT_RIGHT = { x: 0.770, y: 0.460 };
+export const ORBIT_LEFT = { x: 0.136, y: 0.460 };
+export const ORBIT_RIGHT = { x: 0.864, y: 0.460 };
 
-// Outer wall — follows the perimeter of the lane (full loop, left to right)
+// Outer wall — follows the perimeter of the lane (full loop, left to right).
+// The outermost points touch LEFT_WALL (0.05) and RIGHT_WALL (0.95).
+// Right side is a mirror of the left side (x' = 1.0 - x).
+// Bottom-right segments are in a separate one-way array (ORBIT_OUTER_WALLS_ONEWAY).
 export const ORBIT_OUTER_WALLS: ReadonlyArray<WallSegment> = [
-  { x1: 0.110, y1: 0.460, x2: 0.082, y2: 0.350 },   // left entry → up
-  { x1: 0.082, y1: 0.350, x2: 0.064, y2: 0.240 },   // up left wall
-  { x1: 0.064, y1: 0.240, x2: 0.113, y2: 0.120 },   // mid-left
-  { x1: 0.113, y1: 0.120, x2: 0.188, y2: 0.070 },   // upper-left corner
-  { x1: 0.188, y1: 0.070, x2: 0.315, y2: 0.042 },   // rounding top-left
-  { x1: 0.315, y1: 0.042, x2: 0.605, y2: 0.042 },   // along top
-  { x1: 0.605, y1: 0.042, x2: 0.732, y2: 0.070 },   // rounding top-right
-  { x1: 0.732, y1: 0.070, x2: 0.807, y2: 0.120 },   // upper-right corner
-  { x1: 0.807, y1: 0.120, x2: 0.856, y2: 0.240 },   // mid-right
-  { x1: 0.856, y1: 0.240, x2: 0.838, y2: 0.350 },   // down right wall
-  { x1: 0.838, y1: 0.350, x2: 0.810, y2: 0.460 },   // right → exit
+  // Left side
+  { x1: 0.096, y1: 0.460, x2: 0.068, y2: 0.350 },   // left entry → up
+  { x1: 0.068, y1: 0.350, x2: 0.050, y2: 0.240 },   // up left wall (touches LEFT_WALL)
+  { x1: 0.050, y1: 0.240, x2: 0.099, y2: 0.120 },   // mid-left
+  { x1: 0.099, y1: 0.120, x2: 0.174, y2: 0.070 },   // upper-left corner
+  { x1: 0.174, y1: 0.070, x2: 0.301, y2: 0.042 },   // rounding top-left
+  // Top
+  { x1: 0.301, y1: 0.042, x2: 0.699, y2: 0.042 },   // along top (symmetric)
+  // Right side (mirror of left)
+  { x1: 0.699, y1: 0.042, x2: 0.826, y2: 0.070 },   // rounding top-right
+  { x1: 0.826, y1: 0.070, x2: 0.901, y2: 0.120 },   // upper-right corner
+  { x1: 0.901, y1: 0.120, x2: 0.950, y2: 0.240 },   // mid-right (touches RIGHT_WALL)
 ];
 
-// Inner wall — offset 0.08 inward from outer wall (perpendicular miter offset).
+// Right outer wall — one-way collision (inner side only, downward-moving balls).
+// These are the inward-curving segments (x decreases going down) at the lower
+// right. Balls moving upward from the launch lane pass through; balls falling
+// inside the orbit are blocked and guided toward the playfield.
+export const ORBIT_OUTER_WALLS_ONEWAY: ReadonlyArray<WallSegment> = [
+  { x1: 0.950, y1: 0.240, x2: 0.932, y2: 0.350 },   // down right wall
+  { x1: 0.932, y1: 0.350, x2: 0.904, y2: 0.460 },   // right → exit
+];
+
+// Inner wall — offset ~0.08 inward from outer wall.
 // Gap between left and right sections at the top lets balls fall to rollovers.
+// Right side is mirrored from left side (x' = 1.0 - x).
 export const ORBIT_INNER_WALLS: ReadonlyArray<WallSegment> = [
   // Left inner wall (entry up to gap)
-  { x1: 0.190, y1: 0.460, x2: 0.160, y2: 0.334 },
-  { x1: 0.160, y1: 0.334, x2: 0.147, y2: 0.249 },
-  { x1: 0.147, y1: 0.249, x2: 0.178, y2: 0.173 },
-  { x1: 0.178, y1: 0.173, x2: 0.220, y2: 0.145 },   // gap starts here
-  // Right inner wall (gap to exit)
-  { x1: 0.700, y1: 0.145, x2: 0.742, y2: 0.173 },   // gap ends here
-  { x1: 0.742, y1: 0.173, x2: 0.773, y2: 0.249 },
-  { x1: 0.773, y1: 0.249, x2: 0.760, y2: 0.334 },
-  { x1: 0.760, y1: 0.334, x2: 0.730, y2: 0.460 },
+  { x1: 0.176, y1: 0.460, x2: 0.146, y2: 0.334 },
+  { x1: 0.146, y1: 0.334, x2: 0.133, y2: 0.249 },
+  { x1: 0.133, y1: 0.249, x2: 0.164, y2: 0.173 },
+  { x1: 0.164, y1: 0.173, x2: 0.206, y2: 0.145 },   // gap starts here
+  // Right inner wall (mirror of left, gap to exit)
+  { x1: 0.794, y1: 0.145, x2: 0.836, y2: 0.173 },   // gap ends here
+  { x1: 0.836, y1: 0.173, x2: 0.867, y2: 0.249 },
+  { x1: 0.867, y1: 0.249, x2: 0.854, y2: 0.334 },
+  { x1: 0.854, y1: 0.334, x2: 0.824, y2: 0.460 },
 ];
 
-// Center path for rendering (dashed guide line) — midpoint between outer and inner walls
+// Center path for rendering — midpoint between outer and inner walls.
+// Right side is mirrored from left side.
 export const ORBIT_PATH: ReadonlyArray<{ x: number; y: number }> = [
-  { x: 0.150, y: 0.460 },
-  { x: 0.121, y: 0.342 },
-  { x: 0.106, y: 0.245 },
-  { x: 0.146, y: 0.147 },
-  { x: 0.204, y: 0.108 },
-  { x: 0.320, y: 0.082 },
-  { x: 0.600, y: 0.082 },
-  { x: 0.716, y: 0.108 },
-  { x: 0.775, y: 0.147 },
-  { x: 0.815, y: 0.245 },
-  { x: 0.799, y: 0.342 },
-  { x: 0.770, y: 0.460 },
+  { x: 0.136, y: 0.460 },
+  { x: 0.107, y: 0.342 },
+  { x: 0.092, y: 0.245 },
+  { x: 0.132, y: 0.147 },
+  { x: 0.190, y: 0.108 },
+  { x: 0.306, y: 0.082 },
+  { x: 0.694, y: 0.082 },
+  { x: 0.810, y: 0.108 },
+  { x: 0.868, y: 0.147 },
+  { x: 0.908, y: 0.245 },
+  { x: 0.893, y: 0.342 },
+  { x: 0.864, y: 0.460 },
 ];
 
 // ─── Slingshot Layout ─────────────────────────────────────────────────────────

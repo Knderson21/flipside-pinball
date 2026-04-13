@@ -299,6 +299,34 @@ export function collideBallSegment(
   return true;
 }
 
+// ─── One-Sided Wall Segment Collision ────────────────────────────────────────
+// Only collides when the ball is on the "inner" side of the segment (left side
+// of the segment direction vector) AND moving downward. Balls moving upward
+// (still launching / traveling up the lane) always pass through regardless of
+// side. Used for the orbit lane's bottom-right outer wall so balls from the
+// launch lane can enter the orbit but cannot exit back into the launch lane.
+
+export function collideBallSegmentOneSided(
+  ball: Ball,
+  x1: number, y1: number,
+  x2: number, y2: number,
+): boolean {
+  // Balls still moving upward are not blocked — they haven't finished
+  // launching / traveling through the lane yet.
+  if (ball.velocity.y < 0) return false;
+
+  // Cross product of segment direction × (ball - segment start).
+  // Positive = ball is on the left (inner) side → apply collision.
+  // Negative = ball is on the right (outer) side → pass through.
+  const segX = x2 - x1;
+  const segY = y2 - y1;
+  const toBallX = ball.position.x - x1;
+  const toBallY = ball.position.y - y1;
+  const cross = segX * toBallY - segY * toBallX;
+  if (cross < 0) return false;
+  return collideBallSegment(ball, x1, y1, x2, y2);
+}
+
 // ─── Orbit Zone Detection ────────────────────────────────────────────────────
 
 /** Check if a ball is within an orbit entry/exit zone and moving upward fast enough. */

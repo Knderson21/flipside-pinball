@@ -11,7 +11,7 @@ import type {
   Slingshot,
   ThemePack,
 } from './types';
-import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LAUNCH_LANE_CURVE, LOCK_SCOOP, ORBIT_INNER_WALLS, ORBIT_LEFT, ORBIT_OUTER_WALLS, ORBIT_RIGHT, TABLE, TABLE_ASPECT } from './constants';
+import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LAUNCH_LANE_CURVE, LOCK_SCOOP, ORBIT_INNER_WALLS, ORBIT_LEFT, ORBIT_OUTER_WALLS, ORBIT_OUTER_WALLS_ONEWAY, ORBIT_RIGHT, TABLE, TABLE_ASPECT } from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
@@ -392,6 +392,14 @@ export class Renderer {
     ctx.strokeStyle = palette.orbitRailColor;
     ctx.lineWidth = 2;
     for (const seg of ORBIT_OUTER_WALLS) {
+      ctx.beginPath();
+      ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
+      ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));
+      ctx.stroke();
+    }
+
+    // Draw one-way outer walls (solid, same style as regular outer walls)
+    for (const seg of ORBIT_OUTER_WALLS_ONEWAY) {
       ctx.beginPath();
       ctx.moveTo(this.sx(seg.x1), this.sy(seg.y1));
       ctx.lineTo(this.sx(seg.x2), this.sy(seg.y2));

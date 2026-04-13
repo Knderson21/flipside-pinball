@@ -21,6 +21,7 @@ import {
   ORBIT_LEFT,
   ORBIT_MIN_SPEED,
   ORBIT_OUTER_WALLS,
+  ORBIT_OUTER_WALLS_ONEWAY,
   ORBIT_RIGHT,
   ORBIT_SCORE,
   PHYSICS_SUBSTEPS,
@@ -36,6 +37,7 @@ import {
   collideBallDropTarget,
   collideBallFlipper,
   collideBallSegment,
+  collideBallSegmentOneSided,
   collideBallSlingshot,
   collideBallWalls,
   isBallDrained,
@@ -225,6 +227,9 @@ export class Game {
 
         for (const seg of ORBIT_OUTER_WALLS) {
           collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
+        }
+        for (const seg of ORBIT_OUTER_WALLS_ONEWAY) {
+          collideBallSegmentOneSided(ball, seg.x1, seg.y1, seg.x2, seg.y2);
         }
         for (const seg of ORBIT_INNER_WALLS) {
           collideBallSegment(ball, seg.x1, seg.y1, seg.x2, seg.y2);
