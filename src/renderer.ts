@@ -12,7 +12,6 @@ import type {
   ThemePack,
 } from './types';
 import {
-  BALL_RADIUS,
   BALLS_PER_GAME,
   FLIPPER_THICKNESS,
   GUIDE_WALLS,
@@ -51,10 +50,6 @@ export class Renderer {
 
   setTheme(theme: ThemePack): void {
     this.theme = theme;
-  }
-
-  getTheme(): ThemePack {
-    return this.theme;
   }
 
   // ─── Resize / Scaling ───────────────────────────────────────────────────────
@@ -774,15 +769,15 @@ export class Renderer {
 
     const { ctx } = this;
     const cx = this.tableX + this.tableW / 2;
-    const cy = this.tableY + this.tableH * 0.42;
+    const cy = this.tableY + this.tableH * 0.44;
 
     // Fade the last 400ms
-    const alpha = Math.min(1, state.mission.bannerTimer / 400);
+    const alpha = Math.min(0.7, state.mission.bannerTimer / 400);
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const size = Math.round(this.tableW * 0.12);
-    ctx.font = `900 ${size}px ${this.theme.fonts.title}`;
+    const size = Math.round(this.tableW * 0.065);
+    ctx.font = `700 ${size}px ${this.theme.fonts.label}`;
     ctx.fillStyle = palette.accent;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

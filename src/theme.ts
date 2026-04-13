@@ -47,15 +47,15 @@ export const neonTheme: ThemePack = {
     title: '"Courier New", monospace',
   },
   strings: {
-    title: 'PINBALL',
-    subtitle: 'PRESS SPACE OR ENTER',
+    title: 'Neon Arcade',
+    subtitle: 'GET THE HIGH SCORE!',
     pressStart: 'PRESS SPACE OR ENTER',
     gameOver: 'GAME OVER',
     playAgain: 'PRESS SPACE TO PLAY AGAIN',
     pull: 'PULL',
     controls: [
-      'Z / ← = LEFT FLIPPER',
-      '/ / → = RIGHT FLIPPER',
+      'Z or ← = LEFT FLIPPER',
+      '/ or → = RIGHT FLIPPER',
       'SPACE = PLUNGER',
       'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
@@ -73,7 +73,37 @@ export const neonTheme: ThemePack = {
     missionComplete: { type: 'synth', freq: 440, durationMs: 550, wave: 'square',   volume: 0.22, slide: 660 },
     gameOver:        { type: 'synth', freq: 220, durationMs: 700, wave: 'sawtooth', volume: 0.22, slide: -180 },
   },
-  // Neon uses the renderer defaults (no overrides) — pure palette swap.
+  // Synthwave grid backdrop.
+  drawBackdrop: (rc, palette) => {
+    const { ctx, tableX, tableY, tableW, tableH } = rc;
+    ctx.fillStyle = palette.tableFill;
+    ctx.fillRect(tableX, tableY, tableW, tableH);
+
+    const cols = 12;
+    const rows = 24;
+    const cellW = tableW / cols;
+    const cellH = tableH / rows;
+
+    ctx.strokeStyle = palette.wallColor;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.25;
+
+    for (let c = 0; c <= cols; c++) {
+      const x = tableX + c * cellW;
+      ctx.beginPath();
+      ctx.moveTo(x, tableY);
+      ctx.lineTo(x, tableY + tableH);
+      ctx.stroke();
+    }
+    for (let r = 0; r <= rows; r++) {
+      const y = tableY + r * cellH;
+      ctx.beginPath();
+      ctx.moveTo(tableX, y);
+      ctx.lineTo(tableX + tableW, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  },
 };
 
 // ─── Alternate theme: Retro Terminal (orange-on-black) ───────────────────────
@@ -124,15 +154,15 @@ export const retroTheme: ThemePack = {
     title: '"Courier New", monospace',
   },
   strings: {
-    title: 'SPACE CADET',
+    title: 'Retro Terminal',
     subtitle: '>>> INSERT COIN <<<',
     pressStart: 'PRESS SPACE TO BEGIN MISSION',
     gameOver: 'MISSION FAILED',
     playAgain: 'PRESS SPACE TO RETRY',
     pull: 'LAUNCH',
     controls: [
-      'Z / ← = PORT THRUSTER',
-      '/ / → = STARBOARD THRUSTER',
+      'Z or ← = PORT THRUSTER',
+      '/ or → = STARBOARD THRUSTER',
       'SPACE = LAUNCH',
       'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
@@ -156,14 +186,17 @@ export const retroTheme: ThemePack = {
     ctx.fillStyle = palette.tableFill;
     ctx.fillRect(tableX, tableY, tableW, tableH);
 
-    // Deterministic pseudo-random stars (seeded by position — no RNG state).
+    // Deterministic pseudo-random stars using a hash to avoid diagonal banding.
     ctx.fillStyle = palette.labelColor;
     const starCount = 80;
     for (let i = 0; i < starCount; i++) {
-      const sx = ((i * 9301 + 49297) % 233280) / 233280;
-      const sy = ((i * 4903 + 17321) % 233280) / 233280;
-      const r = 0.5 + ((i * 131) % 3) * 0.4;
-      ctx.globalAlpha = 0.3 + ((i * 37) % 5) * 0.1;
+      // Simple integer hash (xorshift-style) to break linear patterns.
+      let hx = i * 374761393 + 1013904223; hx = ((hx >>> 16) ^ hx) * 1274126177; hx = (hx >>> 16) ^ hx;
+      let hy = i * 668265263 + 2654435761; hy = ((hy >>> 16) ^ hy) * 2246822519; hy = (hy >>> 16) ^ hy;
+      const sx = (hx >>> 0) / 4294967296;
+      const sy = (hy >>> 0) / 4294967296;
+      const r = 0.5 + (((hx >>> 8) & 3) * 0.4);
+      ctx.globalAlpha = 0.3 + ((hy >>> 12) % 5) * 0.1;
       ctx.fillRect(tableX + sx * tableW, tableY + sy * tableH, r, r);
     }
     ctx.globalAlpha = 1;
@@ -248,8 +281,8 @@ export const sakuraTheme: ThemePack = {
     playAgain: 'PRESS SPACE TO PLAY AGAIN',
     pull: 'PULL',
     controls: [
-      'Z / \u2190 = LEFT FLIPPER',
-      '/ / \u2192 = RIGHT FLIPPER',
+      'Z or \u2190 = LEFT FLIPPER',
+      '/ or \u2192 = RIGHT FLIPPER',
       'SPACE = PLUNGER',
       'F = SWAP THEME (TAP TOP ON MOBILE)',
     ],
@@ -272,14 +305,16 @@ export const sakuraTheme: ThemePack = {
     ctx.fillStyle = palette.tableFill;
     ctx.fillRect(tableX, tableY, tableW, tableH);
 
-    // Deterministic sparkles
+    // Deterministic sparkles using a hash to avoid diagonal banding.
     ctx.fillStyle = '#ffffff';
     const sparkleCount = 50;
     for (let i = 0; i < sparkleCount; i++) {
-      const sx = ((i * 7919 + 10301) % 233280) / 233280;
-      const sy = ((i * 6271 + 23417) % 233280) / 233280;
-      const size = 1 + ((i * 131) % 3);
-      ctx.globalAlpha = 0.25 + ((i * 53) % 4) * 0.1;
+      let hx = (i + 200) * 374761393 + 1013904223; hx = ((hx >>> 16) ^ hx) * 1274126177; hx = (hx >>> 16) ^ hx;
+      let hy = (i + 200) * 668265263 + 2654435761; hy = ((hy >>> 16) ^ hy) * 2246822519; hy = (hy >>> 16) ^ hy;
+      const sx = (hx >>> 0) / 4294967296;
+      const sy = (hy >>> 0) / 4294967296;
+      const size = 1 + ((hx >>> 8) & 3);
+      ctx.globalAlpha = 0.25 + ((hy >>> 12) % 4) * 0.1;
       // Draw a 4-point star sparkle
       const px = tableX + sx * tableW;
       const py = tableY + sy * tableH;
@@ -299,32 +334,40 @@ export const sakuraTheme: ThemePack = {
       ctx.fill();
     }
 
-    // Deterministic sakura flower outlines scattered across the table
-    const flowerCount = 12;
-    ctx.strokeStyle = '#f48fb1';
-    ctx.lineWidth = 1.2;
-    ctx.globalAlpha = 0.3;
-    for (let i = 0; i < flowerCount; i++) {
-      const fx = ((i * 8831 + 4967) % 233280) / 233280;
-      const fy = ((i * 5101 + 31247) % 233280) / 233280;
-      const fr = 6 + ((i * 71) % 5) * 2;
-      const cx = tableX + fx * tableW;
-      const cy = tableY + fy * tableH;
-      // Draw 5 petals as overlapping ellipses
-      for (let p = 0; p < 5; p++) {
-        const angle = (p * Math.PI * 2) / 5 - Math.PI / 2;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
+    // Deterministic sakura flower outlines scattered across the table.
+    // Two layers: pink flowers and smaller white flowers for depth.
+    const flowers: Array<{ count: number; seed: number; color: string; alpha: number; sizeBase: number; sizeRange: number }> = [
+      { count: 16, seed: 500, color: '#f48fb1', alpha: 0.2,  sizeBase: 6, sizeRange: 5 },
+      { count: 10, seed: 800, color: '#ffffff', alpha: 0.18, sizeBase: 4, sizeRange: 4 },
+    ];
+    for (const layer of flowers) {
+      ctx.strokeStyle = layer.color;
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = layer.alpha;
+      for (let i = 0; i < layer.count; i++) {
+        let hx = (i + layer.seed) * 374761393 + 1013904223; hx = ((hx >>> 16) ^ hx) * 1274126177; hx = (hx >>> 16) ^ hx;
+        let hy = (i + layer.seed) * 668265263 + 2654435761; hy = ((hy >>> 16) ^ hy) * 2246822519; hy = (hy >>> 16) ^ hy;
+        const fx = (hx >>> 0) / 4294967296;
+        const fy = (hy >>> 0) / 4294967296;
+        const fr = layer.sizeBase + ((hx >>> 8) % layer.sizeRange) * 2;
+        const cx = tableX + fx * tableW;
+        const cy = tableY + fy * tableH;
+        // Draw 5 petals as overlapping ellipses
+        for (let p = 0; p < 5; p++) {
+          const angle = (p * Math.PI * 2) / 5 - Math.PI / 2;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.ellipse(0, -fr * 0.6, fr * 0.38, fr * 0.6, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+        // Small circle center
         ctx.beginPath();
-        ctx.ellipse(0, -fr * 0.6, fr * 0.38, fr * 0.6, 0, 0, Math.PI * 2);
+        ctx.arc(cx, cy, fr * 0.18, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.restore();
       }
-      // Small circle center
-      ctx.beginPath();
-      ctx.arc(cx, cy, fr * 0.18, 0, Math.PI * 2);
-      ctx.stroke();
     }
     ctx.globalAlpha = 1;
   },
@@ -365,5 +408,3 @@ export const sakuraTheme: ThemePack = {
 // ─── Theme registry ───────────────────────────────────────────────────────────
 
 export const themes: ThemePack[] = [neonTheme, retroTheme, sakuraTheme];
-
-export const defaultTheme = neonTheme;

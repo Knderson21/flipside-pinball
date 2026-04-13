@@ -636,9 +636,13 @@ export class Game {
     const next = this.themeList[this.themeIndex]!;
     this.renderer.setTheme(next);
     this.audio.setSounds(next.sounds);
-    // Flash a banner so the user sees the swap feedback.
-    this.state.mission.bannerText = next.name.toUpperCase();
-    this.state.mission.bannerTimer = 1200;
+    // Flash a banner so the user sees the swap feedback — but only during
+    // active play. On attract/gameover the theme name is already visible as
+    // the screen title, so a duplicate popup is redundant.
+    if (this.state.phase === 'launching' || this.state.phase === 'playing') {
+      this.state.mission.bannerText = next.name.toUpperCase();
+      this.state.mission.bannerTimer = 1200;
+    }
   }
 
   // ─── High Score Persistence ──────────────────────────────────────────────────
