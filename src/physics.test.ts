@@ -382,7 +382,7 @@ describe('isBallDrained', () => {
 describe('plunger lane — one-way wall', () => {
   it('rejects a playfield ball drifting rightward into the lane', () => {
     const ball = makeBall({
-      position: { x: TABLE.PLUNGER_LANE_LEFT + 0.005, y: 0.5 },
+      position: { x: TABLE.PLUNGER_LANE_LEFT + 0.005, y: 0.6 },
       velocity: { x: 0.001, y: 0 },
       inPlunger: false,
     });
@@ -419,7 +419,7 @@ describe('plunger lane — one-way wall', () => {
 
   it('keeps an inPlunger ball inside the lane if it drifts left', () => {
     const ball = makeBall({
-      position: { x: TABLE.PLUNGER_LANE_LEFT - 0.005, y: 0.5 },
+      position: { x: TABLE.PLUNGER_LANE_LEFT - 0.005, y: 0.6 },
       velocity: { x: -0.001, y: 0 },
       inPlunger: true,
     });
@@ -428,8 +428,8 @@ describe('plunger lane — one-way wall', () => {
     expect(ball.velocity.x).toBeGreaterThan(0);
   });
 
-  it('one-way wall is inactive above the lane exit threshold (y < 0.14)', () => {
-    // Above y = 0.14 the wall does not exist so the ball can arc into the playfield.
+  it('one-way wall is inactive above the lane exit threshold (y < 0.5)', () => {
+    // Above y = 0.5 the wall does not exist so the ball can arc into the playfield.
     const ball = makeBall({
       position: { x: TABLE.BALL_SPAWN_X, y: 0.10 },
       velocity: { x: 0.001, y: -0.003 },
