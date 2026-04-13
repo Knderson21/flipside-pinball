@@ -133,8 +133,8 @@ export const ORBIT_MIN_SPEED = 0.001;
 export const ORBIT_ENTRY_RADIUS = 0.04;
 
 // Entry/exit zones at the bottom of each side of the lane
-export const ORBIT_LEFT = { x: 0.136, y: 0.460 };
-export const ORBIT_RIGHT = { x: 0.864, y: 0.460 };
+export const ORBIT_LEFT = { x: 0.152, y: 0.460 };
+export const ORBIT_RIGHT = { x: 0.848, y: 0.460 };
 
 // Outer wall — follows the perimeter of the lane (full loop, left to right).
 // The outermost points touch LEFT_WALL (0.05) and RIGHT_WALL (0.95).
@@ -142,8 +142,8 @@ export const ORBIT_RIGHT = { x: 0.864, y: 0.460 };
 // Bottom-right segments are in a separate one-way array (ORBIT_OUTER_WALLS_ONEWAY).
 export const ORBIT_OUTER_WALLS: ReadonlyArray<WallSegment> = [
   // Left side
-  { x1: 0.096, y1: 0.460, x2: 0.068, y2: 0.350 },   // left entry → up
-  { x1: 0.068, y1: 0.350, x2: 0.050, y2: 0.240 },   // up left wall (touches LEFT_WALL)
+  { x1: 0.130, y1: 0.500, x2: 0.068, y2: 0.400 },   // left entry → up
+  { x1: 0.068, y1: 0.400, x2: 0.050, y2: 0.240 },   // up left wall (touches LEFT_WALL)
   { x1: 0.050, y1: 0.240, x2: 0.099, y2: 0.120 },   // mid-left
   { x1: 0.099, y1: 0.120, x2: 0.174, y2: 0.070 },   // upper-left corner
   { x1: 0.174, y1: 0.070, x2: 0.301, y2: 0.042 },   // rounding top-left
@@ -169,8 +169,8 @@ export const ORBIT_OUTER_WALLS_ONEWAY: ReadonlyArray<WallSegment> = [
 // Right side is mirrored from left side (x' = 1.0 - x).
 export const ORBIT_INNER_WALLS: ReadonlyArray<WallSegment> = [
   // Left inner wall (entry up to gap)
-  { x1: 0.176, y1: 0.460, x2: 0.146, y2: 0.334 },
-  { x1: 0.146, y1: 0.334, x2: 0.133, y2: 0.249 },
+  { x1: 0.200, y1: 0.460, x2: 0.146, y2: 0.370 },
+  { x1: 0.146, y1: 0.370, x2: 0.133, y2: 0.249 },
   { x1: 0.133, y1: 0.249, x2: 0.164, y2: 0.173 },
   { x1: 0.164, y1: 0.173, x2: 0.206, y2: 0.145 },   // gap starts here
   // Right inner wall (mirror of left, gap to exit)
