@@ -42,7 +42,7 @@ export const TABLE = {
   RIGHT_FLIPPER_X: 0.694,
 
   BALL_SPAWN_X: 0.910,
-  BALL_SPAWN_Y: 0.84,
+  BALL_SPAWN_Y: 0.91,
 
   LANE_FLOOR_Y: 0.91,
 } as const;

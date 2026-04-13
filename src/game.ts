@@ -170,7 +170,7 @@ export class Game {
     const laneBall = state.balls[0];
     if (!laneBall) return;
     laneBall.position.x = TABLE.BALL_SPAWN_X;
-    laneBall.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
+    laneBall.position.y = TABLE.LANE_FLOOR_Y - BALL_RADIUS;
     laneBall.velocity.x = 0;
     laneBall.velocity.y = 0;
     laneBall.active = true;
@@ -352,7 +352,7 @@ export class Game {
     if (midPlayLaneBall) {
       updatePlunger(state.plunger, dtMs);
       midPlayLaneBall.position.x = TABLE.BALL_SPAWN_X;
-      midPlayLaneBall.position.y = TABLE.BALL_SPAWN_Y - state.plunger.charge * 0.04;
+      midPlayLaneBall.position.y = TABLE.LANE_FLOOR_Y - BALL_RADIUS;
       midPlayLaneBall.velocity.x = 0;
       midPlayLaneBall.velocity.y = 0;
       const input = this.input.getState();

@@ -11,7 +11,20 @@ import type {
   Slingshot,
   ThemePack,
 } from './types';
-import { BALLS_PER_GAME, FLIPPER_THICKNESS, GUIDE_WALLS, LOCK_SCOOP, ORBIT_INNER_WALLS, ORBIT_LEFT, ORBIT_OUTER_WALLS, ORBIT_OUTER_WALLS_ONEWAY, ORBIT_RIGHT, TABLE, TABLE_ASPECT } from './constants';
+import {
+  BALL_RADIUS,
+  BALLS_PER_GAME,
+  FLIPPER_THICKNESS,
+  GUIDE_WALLS,
+  LOCK_SCOOP,
+  ORBIT_INNER_WALLS,
+  ORBIT_LEFT,
+  ORBIT_OUTER_WALLS,
+  ORBIT_OUTER_WALLS_ONEWAY,
+  ORBIT_RIGHT,
+  TABLE,
+  TABLE_ASPECT
+} from './constants';
 
 export class Renderer {
   private readonly canvas: HTMLCanvasElement;
@@ -122,12 +135,13 @@ export class Renderer {
     // Backdrop (theme may override)
     if (this.theme.drawBackdrop) {
       this.theme.drawBackdrop(rc, palette);
-      this.drawTableChrome(palette);
     } else {
       this.drawTable(palette);
     }
 
     this.drawPlungerLane(state, palette);
+    // Chrome (wall strokes) drawn after all fills so nothing covers them
+    this.drawTableChrome(palette);
     this.drawOrbit(rc, palette);
     this.drawScoop(state.mission.lock, rc, palette);
     this.drawDropTargets(state.dropTargets, rc, palette);
@@ -162,8 +176,6 @@ export class Renderer {
     ctx.fillStyle = palette.guideColor;
     ctx.fillRect(x, y, this.sl(TABLE.LEFT_WALL), h);
     ctx.fillRect(this.sx(TABLE.RIGHT_WALL), y, this.sl(1 - TABLE.RIGHT_WALL), h);
-
-    this.drawTableChrome(palette);
   }
 
   /** Borders and playfield walls — drawn on top of any custom backdrop. */
@@ -209,7 +221,7 @@ export class Renderer {
   private drawPlungerLane(state: GameState, palette: ColorPalette): void {
     const { ctx } = this;
 
-    ctx.fillStyle = palette.plungerTrackColor;
+    ctx.fillStyle = palette.tableFill;
     ctx.fillRect(
       this.sx(TABLE.PLUNGER_LANE_LEFT),
       this.sy(TABLE.TOP_WALL),
@@ -238,7 +250,7 @@ export class Renderer {
     const laneRight = this.sx(TABLE.RIGHT_WALL);
     const laneWidth = laneRight - laneLeft;
     const laneBottom = this.sy(TABLE.DRAIN_Y);
-    const plungerHeight = this.sl(0.12);
+    const plungerHeight = this.sl(0.14);
 
     const tickCount = 5;
     const tickAreaH = this.sl(0.18);
@@ -252,8 +264,14 @@ export class Renderer {
       ctx.stroke();
     }
 
+    // Cradle bar — the horizontal stop the ball visually rests on
+    const cradleY = this.sy(TABLE.LANE_FLOOR_Y - 0.015);
+    const cradleH = Math.max(4, this.sl(0.008));
+    ctx.fillStyle = palette.plungerColor;
+    ctx.fillRect(laneLeft, cradleY, laneWidth, cradleH);
+
     const compressionOffset = charge * this.sl(0.06);
-    const rodY = laneBottom - compressionOffset;
+    const rodY = laneBottom + compressionOffset;
     const rodH = plungerHeight * (1 - charge * 0.4);
 
     ctx.fillStyle = charge > 0.1 ? palette.plungerChargedColor : palette.plungerColor;
@@ -273,7 +291,9 @@ export class Renderer {
       const fontSize = Math.round(this.sl(0.035));
       ctx.font = `600 ${fontSize}px ${this.theme.fonts.label}`;
       ctx.textAlign = 'center';
-      ctx.fillText(this.theme.strings.pull, laneLeft + laneWidth / 2, laneBottom - this.sl(0.16));
+      ctx.textBaseline = 'top';
+      ctx.fillText(this.theme.strings.pull, laneLeft + laneWidth / 2, laneBottom + 4);
+      ctx.textBaseline = 'alphabetic';
     }
   }
 
@@ -742,7 +762,7 @@ export class Renderer {
     ctx.fillStyle = palette.labelColor;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(`[T] ${this.theme.name}`, this.tableX + this.tableW - 4, hudY + hudH + 6);
+    ctx.fillText(this.theme.name, this.tableX + this.tableW - 4, hudY + hudH + 6);
 
     ctx.textBaseline = 'alphabetic';
   }
