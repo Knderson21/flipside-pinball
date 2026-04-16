@@ -52,6 +52,23 @@ export class Renderer {
     this.theme = theme;
   }
 
+  /** Set font, measure text, and shrink font size until it fits within maxWidth. */
+  private fitText(
+    fontWeight: string | number,
+    baseSize: number,
+    fontFamily: string,
+    text: string,
+    maxWidth: number,
+  ): void {
+    let size = baseSize;
+    this.ctx.font = `${fontWeight} ${Math.round(size)}px ${fontFamily}`;
+    const measured = this.ctx.measureText(text).width;
+    if (measured > maxWidth) {
+      size = size * (maxWidth / measured);
+      this.ctx.font = `${fontWeight} ${Math.round(size)}px ${fontFamily}`;
+    }
+  }
+
   // ─── Resize / Scaling ───────────────────────────────────────────────────────
 
   resize(windowW: number, windowH: number): void {
@@ -776,11 +793,11 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const size = Math.round(this.tableW * 0.065);
-    ctx.font = `700 ${size}px ${this.theme.fonts.label}`;
+    const size = this.tableW * 0.065;
     ctx.fillStyle = palette.accent;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    this.fitText(700, size, this.theme.fonts.label, state.mission.bannerText, this.tableW * 0.9);
     ctx.fillText(state.mission.bannerText, cx, cy);
 
     ctx.restore();
@@ -805,28 +822,30 @@ export class Renderer {
     ctx.fillStyle = palette.overlay;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
 
-    const titleSize = Math.round(this.tableW * 0.14);
-    ctx.font = `900 ${titleSize}px ${this.theme.fonts.title}`;
+    const maxTextW = this.tableW * 0.9;
+
+    const titleSize = this.tableW * 0.14;
     ctx.fillStyle = palette.scoreColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    this.fitText(900, titleSize, this.theme.fonts.title, this.theme.strings.title, maxTextW);
     ctx.fillText(this.theme.strings.title, cx, cy - this.tableH * 0.18);
 
-    const subSize = Math.round(this.tableW * 0.055);
-    ctx.font = `600 ${subSize}px ${this.theme.fonts.label}`;
+    const subSize = this.tableW * 0.055;
     ctx.fillStyle = palette.labelColor;
+    this.fitText(600, subSize, this.theme.fonts.label, this.theme.strings.subtitle, maxTextW);
     ctx.fillText(this.theme.strings.subtitle, cx, cy - this.tableH * 0.06);
 
-    ctx.font = `600 ${Math.round(subSize * 0.85)}px ${this.theme.fonts.label}`;
     ctx.fillStyle = palette.accent;
+    this.fitText(600, subSize * 0.85, this.theme.fonts.label, this.theme.strings.pressStart, maxTextW);
     ctx.fillText(this.theme.strings.pressStart, cx, cy + this.tableH * 0.02);
 
-    const hintSize = Math.round(this.tableW * 0.038);
-    ctx.font = `${hintSize}px ${this.theme.fonts.label}`;
+    const hintSize = this.tableW * 0.038;
     ctx.fillStyle = palette.labelColor;
     for (let i = 0; i < this.theme.strings.controls.length; i++) {
       const line = this.theme.strings.controls[i];
       if (!line) continue;
+      this.fitText('normal', hintSize, this.theme.fonts.label, line, maxTextW);
       ctx.fillText(line, cx, cy + this.tableH * 0.12 + i * this.tableH * 0.04);
     }
 
@@ -843,21 +862,24 @@ export class Renderer {
     ctx.fillStyle = palette.overlay;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
 
-    const titleSize = Math.round(this.tableW * 0.11);
-    ctx.font = `900 ${titleSize}px ${this.theme.fonts.title}`;
+    const maxTextW = this.tableW * 0.9;
+
+    const titleSize = this.tableW * 0.11;
     ctx.fillStyle = palette.bumperLitColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    this.fitText(900, titleSize, this.theme.fonts.title, this.theme.strings.gameOver, maxTextW);
     ctx.fillText(this.theme.strings.gameOver, cx, cy - this.tableH * 0.10);
 
-    const scoreSize = Math.round(this.tableW * 0.065);
-    ctx.font = `700 ${scoreSize}px ${this.theme.fonts.score}`;
+    const scoreSize = this.tableW * 0.065;
+    const scoreText = String(state.score).padStart(7, '0');
+    this.fitText(700, scoreSize, this.theme.fonts.score, scoreText, maxTextW);
     ctx.fillStyle = palette.scoreColor;
-    ctx.fillText(String(state.score).padStart(7, '0'), cx, cy + this.tableH * 0.04);
+    ctx.fillText(scoreText, cx, cy + this.tableH * 0.04);
 
-    const subSize = Math.round(this.tableW * 0.042);
-    ctx.font = `600 ${subSize}px ${this.theme.fonts.label}`;
+    const subSize = this.tableW * 0.042;
     ctx.fillStyle = palette.labelColor;
+    this.fitText(600, subSize, this.theme.fonts.label, this.theme.strings.playAgain, maxTextW);
     ctx.fillText(this.theme.strings.playAgain, cx, cy + this.tableH * 0.14);
 
     ctx.textBaseline = 'alphabetic';
