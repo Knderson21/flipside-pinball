@@ -290,8 +290,8 @@ export const sakuraTheme: ThemePack = {
     title: '"Playfair Display", serif',
   },
   strings: {
-    title: 'SAKURA',
-    subtitle: '~ a dreamy pinball ~',
+    title: 'SAKURA DREAM',
+    subtitle: '~ a kawaii pinball ~',
     pressStart: 'PRESS SPACE TO DREAM',
     pressStartTouch: 'TAP TO DREAM',
     gameOver: 'SWEET DREAMS...',

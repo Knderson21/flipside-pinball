@@ -778,7 +778,7 @@ export class Renderer {
     ctx.fillStyle = palette.labelColor;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(this.theme.name, this.tableX + this.tableW - 4, hudY + hudH + 6);
+    ctx.fillText(this.theme.strings.title, this.tableX + this.tableW - 4, hudY + hudH + 6);
 
     ctx.textBaseline = 'alphabetic';
   }
