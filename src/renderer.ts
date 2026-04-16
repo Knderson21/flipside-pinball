@@ -40,12 +40,16 @@ export class Renderer {
   private lastW = 0;
   private lastH = 0;
 
+  /** True on devices with a touch screen and no fine pointer (phones/tablets). */
+  private readonly isTouch: boolean;
+
   constructor(canvas: HTMLCanvasElement, theme: ThemePack) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not obtain 2D canvas context');
     this.ctx = ctx;
     this.theme = theme;
+    this.isTouch = 'ontouchstart' in window && !matchMedia('(pointer: fine)').matches;
   }
 
   setTheme(theme: ThemePack): void {
@@ -836,14 +840,16 @@ export class Renderer {
     this.fitText(600, subSize, this.theme.fonts.label, this.theme.strings.subtitle, maxTextW);
     ctx.fillText(this.theme.strings.subtitle, cx, cy - this.tableH * 0.06);
 
+    const pressStartText = this.isTouch ? this.theme.strings.pressStartTouch : this.theme.strings.pressStart;
     ctx.fillStyle = palette.accent;
-    this.fitText(600, subSize * 0.85, this.theme.fonts.label, this.theme.strings.pressStart, maxTextW);
-    ctx.fillText(this.theme.strings.pressStart, cx, cy + this.tableH * 0.02);
+    this.fitText(600, subSize * 0.85, this.theme.fonts.label, pressStartText, maxTextW);
+    ctx.fillText(pressStartText, cx, cy + this.tableH * 0.02);
 
+    const controls = this.isTouch ? this.theme.strings.controlsTouch : this.theme.strings.controls;
     const hintSize = this.tableW * 0.038;
     ctx.fillStyle = palette.labelColor;
-    for (let i = 0; i < this.theme.strings.controls.length; i++) {
-      const line = this.theme.strings.controls[i];
+    for (let i = 0; i < controls.length; i++) {
+      const line = controls[i];
       if (!line) continue;
       this.fitText('normal', hintSize, this.theme.fonts.label, line, maxTextW);
       ctx.fillText(line, cx, cy + this.tableH * 0.12 + i * this.tableH * 0.04);
@@ -878,9 +884,10 @@ export class Renderer {
     ctx.fillText(scoreText, cx, cy + this.tableH * 0.04);
 
     const subSize = this.tableW * 0.042;
+    const playAgainText = this.isTouch ? this.theme.strings.playAgainTouch : this.theme.strings.playAgain;
     ctx.fillStyle = palette.labelColor;
-    this.fitText(600, subSize, this.theme.fonts.label, this.theme.strings.playAgain, maxTextW);
-    ctx.fillText(this.theme.strings.playAgain, cx, cy + this.tableH * 0.14);
+    this.fitText(600, subSize, this.theme.fonts.label, playAgainText, maxTextW);
+    ctx.fillText(playAgainText, cx, cy + this.tableH * 0.14);
 
     ctx.textBaseline = 'alphabetic';
   }
