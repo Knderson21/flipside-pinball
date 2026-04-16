@@ -40,16 +40,37 @@ export class Renderer {
   private lastW = 0;
   private lastH = 0;
 
+  /** True on devices with a touch screen and no fine pointer (phones/tablets). */
+  private readonly isTouch: boolean;
+
   constructor(canvas: HTMLCanvasElement, theme: ThemePack) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not obtain 2D canvas context');
     this.ctx = ctx;
     this.theme = theme;
+    this.isTouch = 'ontouchstart' in window && !matchMedia('(pointer: fine)').matches;
   }
 
   setTheme(theme: ThemePack): void {
     this.theme = theme;
+  }
+
+  /** Set font, measure text, and shrink font size until it fits within maxWidth. */
+  private fitText(
+    fontWeight: string | number,
+    baseSize: number,
+    fontFamily: string,
+    text: string,
+    maxWidth: number,
+  ): void {
+    let size = baseSize;
+    this.ctx.font = `${fontWeight} ${Math.round(size)}px ${fontFamily}`;
+    const measured = this.ctx.measureText(text).width;
+    if (measured > maxWidth) {
+      size = size * (maxWidth / measured);
+      this.ctx.font = `${fontWeight} ${Math.round(size)}px ${fontFamily}`;
+    }
   }
 
   // ─── Resize / Scaling ───────────────────────────────────────────────────────
@@ -757,7 +778,7 @@ export class Renderer {
     ctx.fillStyle = palette.labelColor;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(this.theme.name, this.tableX + this.tableW - 4, hudY + hudH + 6);
+    ctx.fillText(this.theme.strings.title, this.tableX + this.tableW - 4, hudY + hudH + 6);
 
     ctx.textBaseline = 'alphabetic';
   }
@@ -776,11 +797,11 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const size = Math.round(this.tableW * 0.065);
-    ctx.font = `700 ${size}px ${this.theme.fonts.label}`;
+    const size = this.tableW * 0.065;
     ctx.fillStyle = palette.accent;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    this.fitText(700, size, this.theme.fonts.label, state.mission.bannerText, this.tableW * 0.9);
     ctx.fillText(state.mission.bannerText, cx, cy);
 
     ctx.restore();
@@ -805,28 +826,32 @@ export class Renderer {
     ctx.fillStyle = palette.overlay;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
 
-    const titleSize = Math.round(this.tableW * 0.14);
-    ctx.font = `900 ${titleSize}px ${this.theme.fonts.title}`;
+    const maxTextW = this.tableW * 0.9;
+
+    const titleSize = this.tableW * 0.14;
     ctx.fillStyle = palette.scoreColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    this.fitText(900, titleSize, this.theme.fonts.title, this.theme.strings.title, maxTextW);
     ctx.fillText(this.theme.strings.title, cx, cy - this.tableH * 0.18);
 
-    const subSize = Math.round(this.tableW * 0.055);
-    ctx.font = `600 ${subSize}px ${this.theme.fonts.label}`;
+    const subSize = this.tableW * 0.055;
     ctx.fillStyle = palette.labelColor;
+    this.fitText(600, subSize, this.theme.fonts.label, this.theme.strings.subtitle, maxTextW);
     ctx.fillText(this.theme.strings.subtitle, cx, cy - this.tableH * 0.06);
 
-    ctx.font = `600 ${Math.round(subSize * 0.85)}px ${this.theme.fonts.label}`;
+    const pressStartText = this.isTouch ? this.theme.strings.pressStartTouch : this.theme.strings.pressStart;
     ctx.fillStyle = palette.accent;
-    ctx.fillText(this.theme.strings.pressStart, cx, cy + this.tableH * 0.02);
+    this.fitText(600, subSize * 0.85, this.theme.fonts.label, pressStartText, maxTextW);
+    ctx.fillText(pressStartText, cx, cy + this.tableH * 0.02);
 
-    const hintSize = Math.round(this.tableW * 0.038);
-    ctx.font = `${hintSize}px ${this.theme.fonts.label}`;
+    const controls = this.isTouch ? this.theme.strings.controlsTouch : this.theme.strings.controls;
+    const hintSize = this.tableW * 0.038;
     ctx.fillStyle = palette.labelColor;
-    for (let i = 0; i < this.theme.strings.controls.length; i++) {
-      const line = this.theme.strings.controls[i];
+    for (let i = 0; i < controls.length; i++) {
+      const line = controls[i];
       if (!line) continue;
+      this.fitText('normal', hintSize, this.theme.fonts.label, line, maxTextW);
       ctx.fillText(line, cx, cy + this.tableH * 0.12 + i * this.tableH * 0.04);
     }
 
@@ -843,22 +868,26 @@ export class Renderer {
     ctx.fillStyle = palette.overlay;
     ctx.fillRect(this.tableX, this.tableY, this.tableW, this.tableH);
 
-    const titleSize = Math.round(this.tableW * 0.11);
-    ctx.font = `900 ${titleSize}px ${this.theme.fonts.title}`;
+    const maxTextW = this.tableW * 0.9;
+
+    const titleSize = this.tableW * 0.11;
     ctx.fillStyle = palette.bumperLitColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    this.fitText(900, titleSize, this.theme.fonts.title, this.theme.strings.gameOver, maxTextW);
     ctx.fillText(this.theme.strings.gameOver, cx, cy - this.tableH * 0.10);
 
-    const scoreSize = Math.round(this.tableW * 0.065);
-    ctx.font = `700 ${scoreSize}px ${this.theme.fonts.score}`;
+    const scoreSize = this.tableW * 0.065;
+    const scoreText = String(state.score).padStart(7, '0');
+    this.fitText(700, scoreSize, this.theme.fonts.score, scoreText, maxTextW);
     ctx.fillStyle = palette.scoreColor;
-    ctx.fillText(String(state.score).padStart(7, '0'), cx, cy + this.tableH * 0.04);
+    ctx.fillText(scoreText, cx, cy + this.tableH * 0.04);
 
-    const subSize = Math.round(this.tableW * 0.042);
-    ctx.font = `600 ${subSize}px ${this.theme.fonts.label}`;
+    const subSize = this.tableW * 0.042;
+    const playAgainText = this.isTouch ? this.theme.strings.playAgainTouch : this.theme.strings.playAgain;
     ctx.fillStyle = palette.labelColor;
-    ctx.fillText(this.theme.strings.playAgain, cx, cy + this.tableH * 0.14);
+    this.fitText(600, subSize, this.theme.fonts.label, playAgainText, maxTextW);
+    ctx.fillText(playAgainText, cx, cy + this.tableH * 0.14);
 
     ctx.textBaseline = 'alphabetic';
   }

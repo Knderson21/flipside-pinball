@@ -203,6 +203,9 @@ export interface ThemeStrings {
   playAgain: string;
   pull: string;
   controls: string[];
+  controlsTouch: string[];
+  pressStartTouch: string;
+  playAgainTouch: string;
 }
 
 /** Sound definition — either a URL asset or a synthesized beep */
