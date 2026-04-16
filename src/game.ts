@@ -137,8 +137,13 @@ export class Game {
   private update(dtMs: number): void {
     const { state } = this;
 
-    updateFlipper(state.flippers[0], dtMs);
-    updateFlipper(state.flippers[1], dtMs);
+    // Flippers are updated inside the substep loop during 'playing' phase
+    // so collision detection sees intermediate positions (prevents tunneling).
+    // For other phases, update them here with the full dtMs.
+    if (state.phase !== 'playing') {
+      updateFlipper(state.flippers[0], dtMs);
+      updateFlipper(state.flippers[1], dtMs);
+    }
 
     // Mission banner fade
     if (state.mission.bannerTimer > 0) {
@@ -186,15 +191,20 @@ export class Game {
   private updatePlaying(dtMs: number): void {
     const { state } = this;
 
-    // Step and collide every active ball that is not held in the plunger lane.
     // Sub-stepping prevents tunneling: at BALL_MAX_SPEED (0.003/ms) and the
     // 32ms frame cap, each sub-step moves the ball at most 0.024 units — safely
     // below the ball radius (0.025) and flipper detection range (0.036).
+    // Flippers are updated inside the substep loop (not once per frame) so they
+    // advance incrementally alongside the ball — prevents the ball tunneling
+    // through a fast-moving flipper, especially at low frame rates on mobile.
     const subDt = dtMs / PHYSICS_SUBSTEPS;
-    for (const ball of state.balls) {
-      if (!ball.active || ball.inPlunger) continue;
+    for (let step = 0; step < PHYSICS_SUBSTEPS; step++) {
+      updateFlipper(state.flippers[0], subDt);
+      updateFlipper(state.flippers[1], subDt);
 
-      for (let step = 0; step < PHYSICS_SUBSTEPS; step++) {
+      for (const ball of state.balls) {
+        if (!ball.active || ball.inPlunger) continue;
+
         stepBall(ball, subDt);
         collideBallWalls(ball);
 
@@ -242,9 +252,12 @@ export class Game {
         collideBallFlipper(ball, state.flippers[0]);
         collideBallFlipper(ball, state.flippers[1]);
       }
+    }
 
-      // Rollover detection — outside the substep loop so each rollover
-      // toggles at most once per frame per ball (entry-edge detection).
+    // Rollover detection — outside the substep loop so each rollover
+    // toggles at most once per frame per ball (entry-edge detection).
+    for (const ball of state.balls) {
+      if (!ball.active || ball.inPlunger) continue;
       if (!ball.touchingRollovers) ball.touchingRollovers = new Set();
       for (const ro of state.rollovers) {
         const touching = checkRollover(ball, ro.position.x, ro.position.y, ROLLOVER_RADIUS);
