@@ -36,6 +36,33 @@ Open [http://localhost:5173](http://localhost:5173).
 - **Responsive** — scales to any viewport using a normalized coordinate system; fills width in portrait, height in landscape.
 - **Zero runtime dependencies** — just the Canvas API.
 
+## Creating a new theme
+
+Themes live in `src/themes/`, one file per theme, each built with the `createTheme()` factory in `src/themes/_builder.ts`. Adding a theme never requires changes to physics, rendering, or game logic.
+
+1. Create a new theme file `src/themes/<id>.ts`.
+2. Add the unique theme content, similar to an existing theme — `id`, `name`, palette overrides, strings, sound mood, optional draw overrides.
+3. Add the import + registry entry in `src/themes/index.ts`.
+4. Run `npm run typecheck && npm test`, then `npm run dev` and press `F` to cycle through.
+
+### Building blocks
+
+`src/themes/_presets.ts` ships reusable defaults you spread into your theme:
+
+- **`PALETTE_PRESETS`** — `dark` (cool blue/cyan) and `pastel` (pink). Spread one and override only the keys that define your theme's identity, or write all 38 palette keys from scratch (see `hell.ts` and `retro.ts` for examples).
+- **`SOUND_MOODS`** — `arcade`, `chiptune`, `dreamy`, `horror`. Each is a complete 11-event sound bundle. Spread one, override individual events to taste.
+- **`DEFAULT_STRINGS`** / **`DEFAULT_FONTS`** — generic copy and a system-stack font fallback. Spread `DEFAULT_STRINGS` and override only the lines that carry your theme's voice.
+
+### Per-theme assets
+
+Drop image or audio files in `src/themes/assets/<id>/` and import them — Vite handles bundling natively:
+
+```ts
+import bumperRoar from './assets/<id>/bumper.mp3';
+
+sounds: { ...SOUND_MOODS.horror, bumper: { type: 'url', src: bumperRoar, volume: 0.3 } },
+```
+
 ## Scripts
 
 ```bash
@@ -61,7 +88,12 @@ npm run test:watch  # Vitest in watch mode
 src/
   types.ts         — shared interfaces (Ball, Flipper, Bumper, Slingshot, RolloverLane, OrbitState, ThemePack, …)
   constants.ts     — physics constants, table layout, positions for bumpers, slingshots, rollovers, scoop, orbit
-  theme.ts         — neonTheme, retroTheme, themes[] registry
+  theme.ts         — back-compat re-export of `./themes`
+  themes/          — one file per theme + builder, presets, registry
+    _builder.ts    — createTheme() factory
+    _presets.ts    — DEFAULT_FONTS, DEFAULT_STRINGS, PALETTE_PRESETS, SOUND_MOODS
+    index.ts       — themes[] registry + named exports
+    neon.ts, retro.ts, sakura.ts, hell.ts
   physics.ts       — pure collision / integration functions
   audio.ts         — AudioManager (Web Audio synth + URL playback)
   renderer.ts      — Renderer class; only place that uses pixel coordinates
