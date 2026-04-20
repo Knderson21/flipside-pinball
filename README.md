@@ -60,7 +60,13 @@ Drop image or audio files in `src/themes/assets/<id>/` and import them — Vite 
 ```ts
 import bumperRoar from './assets/<id>/bumper.mp3';
 
-sounds: { ...SOUND_MOODS.horror, bumper: { type: 'url', src: bumperRoar, volume: 0.3 } },
+export const myTheme = createTheme({
+  // ...
+  sounds: {
+    ...SOUND_MOODS.horror,
+    bumper: { type: 'url', src: bumperRoar, volume: 0.3 },
+  },
+});
 ```
 
 ## Scripts
